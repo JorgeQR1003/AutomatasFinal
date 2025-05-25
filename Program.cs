@@ -132,18 +132,19 @@ internal class Program
     }
 
     //Se declaran los operadores
-    public static string[] op = { "-", "+", "/", "*" };
+    public static string[] op2 = { "/", "*" };
+    public static string[] op1 = { "-", "+" };
 
     //Se declara el diccionario de transiciones del autómata para validar tokens
     public static Dictionary<(string, string, string, string), string> transitionsB = new()
     {
         {("q0", "id", "&", "&"), "q1"},
         {("q1", "=", "&", "&"), "q2"},
-        {("q2", "id", "&", "&"), "q4"}, {("q2", "num", "&", "&"), "q4"}, {("q2", "-", "&", "&"), "q3"}, {("q2", "(", "&", "("), "q7"}, {("q2", "+", "&", "&"), "q3"},
+        {("q2", "id", "&", "&"), "q4"}, {("q2", "num", "&", "&"), "q4"}, {("q2", "op1", "&", "&"), "q3"}, {("q2", "(", "&", "("), "q7"},
         {("q3", "num", "&", "&"), "q4"}, {("q3", "(", "&", "("), "q2"},
-        {("q4", "op", "&", "&"), "q5"}, {("q4", "(", "&", "("), "q8"}, {("q4", ")", "(", "&"), "q4"},
+        {("q4", "op2", "&", "&"), "q5"}, {("q4", "op1", "&", "&"), "q5"}, {("q4", "(", "&", "("), "q8"}, {("q4", ")", "(", "&"), "q4"},
         {("q5", "(", "&", "("), "q5"}, {("q5", "id", "&", "&"), "q6"}, {("q5", "num", "&", "&"), "q6"},
-        {("q6", ")", ")", "&"), "q6"}, {("q6", "op", "&", "&"), "q5"},
+        {("q6", ")", ")", "&"), "q6"}, {("q6", "op2", "&", "&"), "q5"}, {("q6", "op1", "&", "&"), "q5"},
         {("q7", "id", "&", "&"), "q4"}, {("q7", "num", "&", "&"), "q4"}, {("q7", "(", "&", "("), "q7"},
         {("q8", "id", "&", "&"), "q6"}, {("q8", "num", "&", "&"), "q6"},
     };
@@ -167,7 +168,8 @@ internal class Program
             string s = tokens[i];
 
             //Si el caracter es un parentesis, hace su respectivo push o pop a la pila
-            if (s == "(") {
+            if (s == "(")
+            {
                 stack.Push(s);
                 stackIn = "(";
             }
@@ -185,9 +187,13 @@ internal class Program
                 stackOut = ")";
             }
             //Si el caracter es un operador, se le asigna "op" 
-            else if (op.Contains(s))
+            else if (op1.Contains(s))
             {
-                s = "op";
+                s = "op1";
+            }
+            else if (op2.Contains(s))
+            {
+                s = "op2";
             }
 
             //Se mueve entre los estados del diccionario
@@ -196,6 +202,7 @@ internal class Program
             else
                 //Si no se encuentra la transicion, regresa falso ya que no es parte del lenguaje
                 return false;
+            Console.WriteLine(currentState);
         }
 
         //Se verifica si la pila esta vacia y si termino en estado final
