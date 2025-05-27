@@ -202,7 +202,6 @@ internal class Program
             else
                 //Si no se encuentra la transicion, regresa falso ya que no es parte del lenguaje
                 return false;
-            Console.WriteLine(currentState);
         }
 
         //Se verifica si la pila esta vacia y si termino en estado final
