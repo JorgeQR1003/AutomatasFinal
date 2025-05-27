@@ -140,13 +140,11 @@ internal class Program
     {
         {("q0", "id", "&", "&"), "q1"},
         {("q1", "=", "&", "&"), "q2"},
-        {("q2", "id", "&", "&"), "q4"}, {("q2", "num", "&", "&"), "q4"}, {("q2", "op1", "&", "&"), "q3"}, {("q2", "(", "&", "("), "q7"},
+        {("q2", "id", "&", "&"), "q4"}, {("q2", "num", "&", "&"), "q4"}, {("q2", "op1", "&", "&"), "q3"}, {("q2", "(", "&", "("), "q2"},
         {("q3", "num", "&", "&"), "q4"}, {("q3", "(", "&", "("), "q2"},
-        {("q4", "op2", "&", "&"), "q5"}, {("q4", "op1", "&", "&"), "q5"}, {("q4", "(", "&", "("), "q8"}, {("q4", ")", "(", "&"), "q4"},
+        {("q4", "op2", "&", "&"), "q5"}, {("q4", "op1", "&", "&"), "q5"}, {("q4", "(", "&", "("), "q5"}, {("q4", ")", "(", "&"), "q4"},
         {("q5", "(", "&", "("), "q5"}, {("q5", "id", "&", "&"), "q6"}, {("q5", "num", "&", "&"), "q6"},
-        {("q6", ")", ")", "&"), "q6"}, {("q6", "op2", "&", "&"), "q5"}, {("q6", "op1", "&", "&"), "q5"},
-        {("q7", "id", "&", "&"), "q4"}, {("q7", "num", "&", "&"), "q4"}, {("q7", "(", "&", "("), "q7"},
-        {("q8", "id", "&", "&"), "q6"}, {("q8", "num", "&", "&"), "q6"},
+        {("q6", ")", "(", "&"), "q6"}, {("q6", "op2", "&", "&"), "q5"}, {("q6", "op1", "&", "&"), "q5"},
     };
 
     public static string finalState = "q6";
@@ -184,7 +182,7 @@ internal class Program
                     //Si la pila esta vacia y se intenta hacer un pop, regresa falso
                     return false;
                 }
-                stackOut = ")";
+                stackOut = "(";
             }
             //Si el caracter es un operador, se le asigna "op" 
             else if (op1.Contains(s))
@@ -202,6 +200,7 @@ internal class Program
             else
                 //Si no se encuentra la transicion, regresa falso ya que no es parte del lenguaje
                 return false;
+            Console.WriteLine(currentState);
         }
 
         //Se verifica si la pila esta vacia y si termino en estado final
