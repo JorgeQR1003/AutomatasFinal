@@ -28,7 +28,7 @@ internal class Program
         {("q3", '+'), "q8"},
         {("q4", '-'), "q9"},
         {("q5", '='), "q10"},
-        {("q6", '='), "q11"},
+        {("q6", '='), "q11"}, {("q6", '/'), "q181"},
         {("q7", '='), "q12"},
         {("q14", '='), "q15"},
         {("q16", '&'), "q17"},
@@ -192,6 +192,7 @@ internal class Program
         {("q176", 'e'), "q177"}, {("q176", '@'), "q51"},
         {("q177", '@'), "q51"},
         {("q179", '#'), "q179"}, {("q179", '"'), "q180"},
+        {("q181", '#'), "q181"}, {("q181", '>'), "q182"},
     };
 
     //Se establecen los diferentes estados finales
@@ -204,6 +205,7 @@ internal class Program
         "q125", "q129", "q131", "q138", "q141", "q142", "q148", "q153", "q156", "q159",
         "q162", "q165", "q170", "q172", "q174", "q177" };
     public static string[] finalLiteralString = { "q180" };
+    public static string[] finalComment = { "q182" };
     public static string[] notFinal = { "q16", "q18" };
 
     //Metodo para tokenizar un string
@@ -229,6 +231,15 @@ internal class Program
                 else
                     x = '#';
             }
+            else if (currentState == "q181")
+            {
+                if (c == '>')
+                    x = '>';
+                else
+                    x = '#';
+            }
+            else if (numeros.Contains(c))
+                x = '0';
             else if (specialCharacters.Contains(c) || letters.Contains(c))
                 x = c;
             else if (numeros.Contains(c))
@@ -241,6 +252,7 @@ internal class Program
                     tokens.Add("NUM");
                 else if (finalLiteralString.Contains(currentState))
                     tokens.Add("LITERAL");
+                else if (finalComment.Contains(currentState)) { }
                 else if (notFinal.Contains(currentState) || initialState == currentState)
                 {
                     //Si se queda en un estado no final y encuentra un espacio, no pertenece al lenguaje
