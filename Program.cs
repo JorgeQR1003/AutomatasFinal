@@ -64,7 +64,7 @@ internal class Program
         {("q48", 'a'), "q49"}, {("q48", '@'), "q51"},
         {("q49", 't'), "q50"}, {("q49", '@'), "q51"},
         {("q50", '@'), "q51"},
-        {("q51", '@'), "q51"},
+        {("q51", '@'), "q51"}, {("q51", '0'), "q51"},
         {("q52", '*'), "q178"},
         {("q53", 't'), "q54"}, {("q53", '@'), "q51"},
         {("q54", '@'), "q51"},
@@ -242,26 +242,10 @@ internal class Program
                 x = '0';
             else if (specialCharacters.Contains(c) || letters.Contains(c))
                 x = c;
-            else if (numeros.Contains(c))
-                x = '0';
             else if (c == ' ')
             {
-                if (finalExact.Contains(currentState))
-                    tokens.Add(temp);
-                else if (finalNum.Contains(currentState))
-                    tokens.Add("NUM");
-                else if (finalLiteralString.Contains(currentState))
-                    tokens.Add("LITERAL");
-                else if (finalComment.Contains(currentState)) { }
-                else if (notFinal.Contains(currentState) || initialState == currentState)
-                {
-                    //Si se queda en un estado no final y encuentra un espacio, no pertenece al lenguaje
-                    Console.WriteLine("Error: Cadena incompleta");
-                    return new List<string>();
-                }
-                else
-                    //Se quedo un estado final para un ID
-                    tokens.Add("ID");
+                addToken(tokens, initialState, currentState, temp);
+
                 temp = string.Empty;
                 currentState = initialState;
                 continue;
@@ -285,32 +269,63 @@ internal class Program
                     x = '@';
                     if (transitionsA.TryGetValue((currentState, x), out string next))
                         currentState = next;
+                    else
+                    {
+                        if (transitionsA.TryGetValue((initialState, x), out string nextTemp) && !((numeros.Contains(input[i-1])) && (letters.Contains(c))))
+                        {
+                            addToken(tokens, initialState, currentState, temp);
+                            currentState = initialState;
+                            temp = string.Empty;
+                            i--;
+                        }
+                        else
+                        {
+                            Console.WriteLine("Error: Transicion no valida");
+                            return new List<string>();
+                        }
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("Error: Transicion no valida");
-                    return new List<string>();
+                    if (transitionsA.TryGetValue((initialState, x), out string nextTemp) && !((numeros.Contains(input[i-1])) && (letters.Contains(c))))
+                    {
+                        addToken(tokens, initialState, currentState, temp);
+                        currentState = initialState;
+                        temp = string.Empty;
+                        i--;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error: Transicion no valida");
+                        return new List<string>();
+                    }
                 }
             }
         }
 
+        addToken(tokens, initialState, currentState, temp);
+
+        return tokens;
+    }
+
+    public static void addToken(List<string> tokens, string initialState, string currentState, string temp)
+    {
         if (finalExact.Contains(currentState))
             tokens.Add(temp);
         else if (finalNum.Contains(currentState))
             tokens.Add("NUM");
         else if (finalLiteralString.Contains(currentState))
             tokens.Add("LITERAL");
+        else if (finalComment.Contains(currentState)) { }
         else if (notFinal.Contains(currentState) || initialState == currentState)
         {
             //Si se queda en un estado no final y encuentra un espacio, no pertenece al lenguaje
             Console.WriteLine("Error: Cadena incompleta");
-            return new List<string>();
+            tokens = new List<string>();
         }
         else
             //Se quedo un estado final para un ID
             tokens.Add("ID");
-
-        return tokens;
     }
 
     static void Main(string[] args)
