@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Security;
+using AnalizadorLexico;
 
 internal class Program
 {
@@ -321,6 +322,7 @@ internal class Program
         {
             //Si se queda en un estado no final y encuentra un espacio, no pertenece al lenguaje
             Console.WriteLine("Error: Cadena incompleta");
+            Console.WriteLine("Cadena: " + temp);
             tokens = new List<string>();
         }
         else
@@ -330,13 +332,11 @@ internal class Program
 
     static void Main(string[] args)
     {
-        string input = "";
+        Scanner scanner = new Scanner("/Users/gibran/RiderProjects/AutomatasFinal2/FilePruebas.txt");
 
-        Console.WriteLine("Ingresa una cadena: ");
-        input = Console.ReadLine();
-
+       
         //Se hace un lista de tokens con el string
-        List<string> tokens = GetTokens(input);
+        List<string> tokens = GetTokens(scanner.getInput());
 
         //Se verifica si la lista de tokens es vacia
         if (tokens.Count == 0)

@@ -1,0 +1,13 @@
+function main() {
+    int temp1 = 3;
+    int temp2 = 4
+    sd
+    int[] arreglodeints = { 1, 2, 3};
+    int resultado = Suma(temp1, temp2);
+    
+    Show(resultado);
+    for(int x = 0; x < 10; x++) {
+        Show(arreglodeints[x]);
+    }
+    
+}
