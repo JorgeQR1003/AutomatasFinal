@@ -264,7 +264,7 @@ internal class Program
             }
             else
             {
-                if (letters.Contains(c))
+                if (letters.Contains(c) || numeros.Contains(c))
                 {
                     x = '@';
                     if (transitionsA.TryGetValue((currentState, x), out string next))
