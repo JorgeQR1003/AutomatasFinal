@@ -1,7 +1,6 @@
 function Main() {
-    const pi = 3.14159;
     string mensaje = "Hola mundo";
-    bool activo = true;
+    bool activo = 0;
     char simbolo = "x";
     
     resultado = 10 + 5 * 2;
@@ -11,7 +10,7 @@ function Main() {
     contador = contador + 1;
     valor = valor - 1;
     
-    if (resultado > 10 && activo == true) {
+    if (resultado > 10 && activo == 1) {
         Show("Mayor que 10");
     } else {
         Show("Menor o igual");
@@ -38,5 +37,6 @@ function Main() {
         Show("Error");
     }
     
+    ;;;;
     return 0;
 }
