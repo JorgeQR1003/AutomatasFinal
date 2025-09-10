@@ -334,10 +334,11 @@ internal class Program
     static void Main(string[] args)
     {
         Scanner scanner = new Scanner("/Users/gibran/RiderProjects/AutomatasFinal2/FilePruebas.txt");
-
+        Scanner scanner2 = new Scanner("/Users/gibran/RiderProjects/AutomatasFinal2/FilePruebas2.txt");
        
         //Se hace un lista de tokens con el string
         List<string> tokens = GetTokens(scanner.getInput());
+        List<string> tokens2 = GetTokens(scanner2.getInput());
 
         //Se verifica si la lista de tokens es vacia
         if (tokens.Count == 0)
@@ -348,7 +349,7 @@ internal class Program
         //Se imprime la lista de tokens
         Console.WriteLine("Expresion tokenizada: ");
         Console.Write("[");
-        foreach (string token in tokens)
+        foreach (string token in tokens2)
         {
             Console.Write($" {token} ");
         }
