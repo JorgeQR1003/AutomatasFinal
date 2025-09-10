@@ -1,15 +1,42 @@
-function main() {
-    int temp1 = 3;
-    int temp2 = 4
-    sd
-    int[] arreglodeints = { 1, 2, 3};
-    int resultado = Suma(temp1, temp2);
+function Main() {
+    const pi = 3.14159;
+    string mensaje = "Hola mundo";
+    bool activo = true;
+    char simbolo = "x";
     
-    Show(resultado);
-    for(int x = 0; x < 10; x++) {
-        Show(arreglodeints[x]);
+    resultado = 10 + 5 * 2;
+    division = resultado / 4;
+    modulo = 15 % 4;
+    
+    contador = contador + 1;
+    valor = valor - 1;
+    
+    if (resultado > 10 && activo == true) {
+        Show("Mayor que 10");
+    } else {
+        Show("Menor o igual");
     }
     
+    for (i = 0; i < 10; i = i + 1) {
+        if (i == 5) {
+            break;
+        }
+        Show(i);
+    }
+    
+    while (contador > 0) {
+        contador = contador - 1;
+    }
+    
+    case (opcion) {
+        return 1;
+    }
+    
+    try {
+        resultado = 10 / 0;
+    } catch {
+        Show("Error");
+    }
+    
+    return 0;
 }
-
-int

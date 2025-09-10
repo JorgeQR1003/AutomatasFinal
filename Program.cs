@@ -202,7 +202,7 @@ internal class Program
         "q10", "q11", "q12", "q13", "q14", "q15", "q17", "q19", "q23", "q27", "q34",
         "q37", "q44", "q50", "q54", "q55", "q57", "q63", "q68", "q69", "q72", "q76",
         "q78", "q83", "q86", "q13", "q14", "q15", "q17", "q19", "q23", "q27", "q34",
-        "q10", "q11", "q90", "q97", "q101", "q105", "q107", "q112", "q117", "q120", 
+        "q10", "q11", "q90", "q97", "q101", "q105", "q107", "q109", "q112", "q117", "q120", 
         "q125", "q129", "q131", "q138", "q141", "q142", "q148", "q153", "q156", "q159",
         "q162", "q165", "q170", "q172", "q174", "q177" };
     public static string[] finalLiteralString = { "q180" };
@@ -254,6 +254,7 @@ internal class Program
             else
             {
                 //En caso de que el caracter no pertenezca al lenguaje se regresa una lista vacia, indicando que hubo un error
+                 
                 Console.WriteLine("Error: Caracter no perteneciente al lenguaje");
                 return new List<string>();
             }

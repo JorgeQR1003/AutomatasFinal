@@ -18,7 +18,9 @@ public class Scanner
         string codeAsAString = "";
         foreach (var line in wholeFile)
         {
+            
             var formattedLine = line.Trim() + " ";
+            Console.WriteLine(formattedLine);
             formattedLine = (formattedLine == " ") ? "" : formattedLine;
             codeAsAString += formattedLine;
 
