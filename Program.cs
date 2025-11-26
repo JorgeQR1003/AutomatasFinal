@@ -20,7 +20,7 @@ internal class Program
             {("q0", 'c'), "q28"}, { ("q0", 'C'), "q45"}, { ("q0", 'd'), "q58"}, { ("q0", 'D'), "q64"}, { ("q0", 'e'), "q73"},
             {("q0", 'E'), "q79"}, { ("q0", 'f'), "q84"}, { ("q0", 'G'), "q98"}, { ("q0", 'i'), "q106"}, { ("q0", 'I'), "q110"},
             {("q0", 'L'), "q121"}, { ("q0", 'P'), "q130"}, { ("q0", 'r'), "q132"}, { ("q0", 'R'), "q133"},
-            {("q0", 's'), "q143"}, { ("q0", 'S'), "q154"}, { ("q0", 'T'), "q167"}, { ("q0", 'w'), "q168"},
+            {("q0", 's'), "q143"}, { ("q0", 'S'), "q154"}, { ("q0", 'T'), "q167"},
             {("q0", 'v'), "q91"}, {("q0", '@'), "q51"}, {("q0", '*'), "q52"}, {("q0", '('), "q13"}, {("q0", ')'), "q13"}, {("q0", '{'), "q13"}, 
             {("q0", '}'), "q13"}, {("q0", ','), "q13"}, {("q0", ';'), "q13"}, {("q0", '['), "q13"}, {("q0", ']'), "q13"},
             {("q0", '/'), "q13"}, {("q0", '%'), "q13"}, {("q0", '"'), "q179"},
@@ -169,15 +169,10 @@ internal class Program
         {("q164", 'e'), "q165"}, {("q164", '@'), "q51"},
         {("q165", '@'), "q51"},
         {("q167", 'a'), "q171"}, {("q167", '@'), "q51"},
-        {("q168", 'h'), "q173"}, {("q168", '@'), "q51"},
         {("q170", '@'), "q51"},
         {("q171", 'n'), "q172"}, {("q171", 'b'), "q174"}, {("q171", '@'), "q51"},
         {("q172", '@'), "q51"},
-        {("q173", 'i'), "q175"}, {("q173", '@'), "q51"},
         {("q174", '@'), "q51"},
-        {("q175", 'l'), "q176"}, {("q175", '@'), "q51"},
-        {("q176", 'e'), "q177"}, {("q176", '@'), "q51"},
-        {("q177", '@'), "q51"},
         {("q179", '#'), "q179"}, {("q179", '"'), "q180"},
         {("q181", '#'), "q181"}, {("q181", '>'), "q182"},
     };
@@ -186,18 +181,18 @@ internal class Program
     public static string[] finalNum = { "q1", "q2" };
     public static string[] finalExact = { "q3", "q4", "q5", "q6", "q7", "q8", "q9",
         "q10", "q11", "q12", "q13", "q14", "q15", "q17", "q19", "q23", "q27", "q31", "q34",
-        "q37", "q44", "q50", "q54", "q55", "q57", "q63", "q68", "q69", "q72",
+        "q37", "q44", "q50", "q52", "q54", "q55", "q57", "q63", "q68", "q69", "q72",
         "q78", "q83", "q86", "q90", "q94", "q101", "q105", "q107", "q109", "q112", "q117", "q120", 
         "q125", "q131", "q138", "q141", "q142", "q148", "q153", "q156", "q159",
-        "q162", "q165", "q170", "q172", "q174", "q177" };
+        "q162", "q165", "q170", "q172", "q174" };
     public static string[] finalLiteralString = { "q180" };
     public static string[] finalComment = { "q182" };
     public static string[] notFinal = { "q16", "q18" };
 
     //Metodo para tokenizar un string
-    public static List<string> GetTokens(string input)
+    public static List<(string, string)> GetTokens(string input)
     {
-        List<string> tokens = new List<string>();
+        List<(string, string)> tokens = new List<(string, string)>();
         char x = '.';
         string temp = "";
         string initialState = "q0";
@@ -241,7 +236,7 @@ internal class Program
                 //En caso de que el caracter no pertenezca al lenguaje se regresa una lista vacia, indicando que hubo un error
                  
                 Console.WriteLine("Error: Caracter no perteneciente al lenguaje");
-                return new List<string>();
+                return new List<(string, string)>();
             }
 
             if (transitionsA.TryGetValue((currentState, x), out string nextState))
@@ -255,10 +250,13 @@ internal class Program
                 {
                     x = '@';
                     if (transitionsA.TryGetValue((currentState, x), out string next))
+                    {
                         currentState = next;
+                        temp += c;
+                    }
                     else
                     {
-                        if (transitionsA.TryGetValue((initialState, x), out string nextTemp) && !((numeros.Contains(input[i-1])) && (letters.Contains(c))))
+                        if (transitionsA.TryGetValue((initialState, x), out string nextTemp) && !((numeros.Contains(input[i - 1])) && (letters.Contains(c))))
                         {
                             addToken(tokens, initialState, currentState, temp);
                             currentState = initialState;
@@ -268,7 +266,7 @@ internal class Program
                         else
                         {
                             Console.WriteLine("Error: Transicion no valida");
-                            return new List<string>();
+                            return new List<(string, string)>();
                         }
                     }
                 }
@@ -284,7 +282,7 @@ internal class Program
                     else
                     {
                         Console.WriteLine("Error: Transicion no valida");
-                        return new List<string>();
+                        return new List<(string, string)>();
                     }
                 }
             }
@@ -295,25 +293,34 @@ internal class Program
         return tokens;
     }
 
-    public static void addToken(List<string> tokens, string initialState, string currentState, string temp)
+    public static void addToken(List<(string, string)> tokens, string initialState, string currentState, string temp)
     {
         if (finalExact.Contains(currentState))
-            tokens.Add(temp);
+        {
+            tokens.Add((temp, temp));
+        }
         else if (finalNum.Contains(currentState))
-            tokens.Add("NUM");
+        {
+            tokens.Add(("NUM", temp));
+        }
         else if (finalLiteralString.Contains(currentState))
-            tokens.Add("LITERAL");
+        {
+            tokens.Add(("LITERAL", temp));
+        }
         else if (finalComment.Contains(currentState)) { }
         else if (notFinal.Contains(currentState) || initialState == currentState)
         {
             //Si se queda en un estado no final y encuentra un espacio, no pertenece al lenguaje
             Console.WriteLine("Error: Cadena incompleta");
             Console.WriteLine("Cadena: " + temp);
-            tokens = new List<string>();
+            tokens = new List<(string, string)>();
+            return;
         }
         else
+        {
             //Se quedo un estado final para un ID
-            tokens.Add("ID");
+            tokens.Add(("ID", temp));
+        }
     }
 
     static void Main(string[] args)
@@ -321,7 +328,7 @@ internal class Program
         Scanner scanner = new Scanner("C:\\Users\\jqr_0\\source\\repos\\AutomatasFinal\\FilePruebas.txt");
        
         //Se hace un lista de tokens con el string
-        List<string> tokens = GetTokens(scanner.getInput());
+        List<(string, string)> tokens = GetTokens(scanner.getInput());
 
         //Se verifica si la lista de tokens es vacia
         if (tokens.Count == 0)
@@ -331,12 +338,10 @@ internal class Program
 
         //Se imprime la lista de tokens
         Console.WriteLine("Expresion tokenizada: ");
-        Console.Write("[");
-        foreach (string token in tokens)
+        foreach ((string token, string lexema) in tokens)
         {
-            Console.Write($" {token} ");
+            Console.WriteLine($" {token} : {lexema}");
         }
-        Console.Write("]");
         Console.WriteLine();
 
         Console.ReadKey();
