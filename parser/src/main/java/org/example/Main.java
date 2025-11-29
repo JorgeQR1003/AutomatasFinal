@@ -40,7 +40,7 @@ public class Main {
         // Test 4: Función con arrays (según gramática: Val' -> [ num ] para acceso)
         // int Main() { int [ ] ID = NUM ; ID = ID [ NUM ] + NUM ; return NUM ; }
         String[] test4 = {
-            "int", "ID", "(", ")", "{",
+             "ID", "(", ")", "{",
             "int", "[", "]", "ID", "=", "NUM", ";",
             "ID", "=", "ID", "[", "NUM", "]", "+", "NUM", ";",
             "return", "NUM", ";",
@@ -49,22 +49,38 @@ public class Main {
 
         System.out.println("========== TEST 1: Asignaciones y Operaciones ==========");
         Parser parser1 = new Parser(test1);
-        parser1.Parse();
+        AstNode ast1 = parser1.Parse();
+        if (ast1 != null) {
+            System.out.println("AST Structure:");
+            System.out.println(ast1);
+        }
         System.out.println();
 
         System.out.println("========== TEST 2: Condicionales if-else ==========");
         Parser parser2 = new Parser(test2);
-        parser2.Parse();
+        AstNode ast2 = parser2.Parse();
+        if (ast2 != null) {
+            System.out.println("AST Structure:");
+            System.out.println(ast2);
+        }
         System.out.println();
 
         System.out.println("========== TEST 3: For loop y Métodos ==========");
         Parser parser3 = new Parser(test3);
-        parser3.Parse();
+        AstNode ast3 = parser3.Parse();
+        if (ast3 != null) {
+            System.out.println("AST Structure:");
+            System.out.println(ast3);
+        }
         System.out.println();
 
         System.out.println("========== TEST 4: Arrays ==========");
         Parser parser4 = new Parser(test4);
-        parser4.Parse();
+        AstNode ast4 = parser4.Parse();
+        if (ast4 != null) {
+            System.out.println("AST Structure:");
+            System.out.println(ast4);
+        }
     }
 }
 

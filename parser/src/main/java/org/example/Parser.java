@@ -8,8 +8,8 @@ public class Parser {
     private final List<String> tokens;
     private String currentToken;
     private int currentIndex;
-    private boolean res;
-
+    // private boolean res; // No longer used as primary success indicator
+    
     private String[] dataTypes = {"string", "void", "int", "bool", "char", "double"};
     private String[] firstAssign = {"string", "void", "int", "bool", "char", "double", "ID"};
     private String[] methodNames = {"Show", "Input", "Genf", "Deriv", "DerivX", "Integ", "IntegX", "Graph", "Slope", "Tab", "Root", "RootX", "Sen", "Cos", "Tan", "Sec", "Csc", "Cot", "Limit", "Concat", "Dist"};
@@ -17,854 +17,648 @@ public class Parser {
     private String[] op = {"+", "-", "*", "/", "%", "**"};
     private String[] vals = {"NUM", "LITERAL", "INF", "PI"};
     private String[] opIncr = {"++", "--"};
-    private String[] syntacticWords = {"{", "}", "(", ")", "[", "]", ";", "," };
-
+    // private String[] syntacticWords = {"{", "}", "(", ")", "[", "]", ";", "," };
 
     public Parser(String[] tokens) {
         this.tokens = new ArrayList<>(Arrays.asList(tokens));
         this.tokens.add("eof");
-        this.res = false;
         this.currentIndex = 0;
         this.currentToken = this.tokens.get(currentIndex);
     }
 
-    public void Parse() {
-        System.out.println("Starting parse. Current token: " + currentToken + " (index: " + currentIndex + ")");
-        res = Program();
-        if (!res) {
-            System.out.println("Error: Program failed at token: " + currentToken + " (index: " + currentIndex + ")");
-        }
-        else {
+    public AstNode Parse() {
+        System.out.println("Starting parse...");
+        AstNode root = Program();
+        if (root != null && currentToken.equals("eof")) {
             System.out.println("Program parsed successfully");
+            return root;
+        } else {
+            System.out.println("Error: Program failed to parse. Unexpected token: " + currentToken);
+            return null;
         }
     }
 
     /// Program -> Function Program | ε
-    public boolean Program() {
-        if (Contains(currentToken, dataTypes)) {
-            res = Function();
-            if (!res) {
-                System.out.println("Error in Program: Function() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
+    public AstNode Program() {
+        AstNode programNode = new AstNode("Program");
+        
+        while (Contains(currentToken, dataTypes)) {
+            AstNode funcNode = Function();
+            if (funcNode == null) {
+                return null;
             }
-            return Program();
+            programNode.addChild(funcNode);
         }
-        return true;
+        
+        return programNode;
+    }
+
+    /// Function -> Type ident ( FParam ) { InstList }
+    public AstNode Function() {
+        AstNode funcNode = new AstNode("Function");
+        
+        // Type
+        AstNode typeNode = Type();
+        if (typeNode == null) return null;
+        funcNode.addChild(typeNode);
+        
+        // ID
+        if (!Match("ID")) {
+            System.out.println("Error in Function: Expected ID");
+            return null;
+        }
+        String funcName = tokens.get(currentIndex - 1); // Previous token was the ID
+        funcNode.addChild(new AstNode("Identifier", funcName));
+        
+        consumeToken(); 
+        
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode paramsNode = new AstNode("Parameters");
+        if (!FParam(paramsNode)) return null;
+        funcNode.addChild(paramsNode);
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode bodyNode = InstList();
+        if (bodyNode == null) return null;
+        funcNode.addChild(bodyNode);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        return funcNode;
     }
 
     /// Type -> TypeVal Type'
-    public boolean Type() {
-        res = TypeVal();
-        if (!res) {
-            System.out.println("Error in Type: TypeVal() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = TypePr();
-        if (!res) {
-            System.out.println("Error in Type: TypePr() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return true;
+    public AstNode Type() {
+        String baseType = currentToken;
+        if (!TypeVal()) return null;
+        
+        String suffix = TypePr(); // Returns "[]" or ""
+        if (suffix == null) return null;
+        
+        return new AstNode("Type", baseType + suffix);
     }
 
     /// Type' -> ε | [ ]
-    public boolean TypePr(){
-        res = Match("[");
-        if (res) {
-            currentToken = getNextToken();
-            res = Match("]");
-            if (res) {
-                currentToken = getNextToken();
-                return true;
+    public String TypePr() {
+        if (CheckAndConsume("[")) {
+            if (MatchAndConsume("]")) {
+                return "[]";
             }
-            System.out.println("Error in TypePr: Expected ']', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+            return null;
         }
-        return true;
+        return "";
     }
 
     /// TypeVal -> void | string | int | double | char | bool
     public boolean TypeVal() {
-        res = Contains(currentToken, dataTypes);
-        if (!res) {
-            System.out.println("Error in TypeVal: Expected dataType, found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+        if (Contains(currentToken, dataTypes)) {
+            consumeToken();
+            return true;
         }
-        currentToken = getNextToken();
-        return true;
-    }
-
-    /// Op -> + | - | / | * | % | **
-    public boolean Op() {
-        res = Contains(currentToken, op);
-        if (!res) {
-            System.out.println("Error in Op: Expected operator, found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        return true;
-    }
-
-    //MethodName -> Show | Graph | Deriv | DerivX | Integ | IntegX | Root | RootX | Limit | Genf | Sin | Cos | Tan | Sec | Csc | Cot | Concat | Tab | Slope | Dist | Input
-    public boolean MethodName() {
-        res = Contains(currentToken, methodNames);
-        if (!res) {
-            System.out.println("Error in MethodName: Expected method name, found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        return true;
-    }
-
-    /// InstList -> Inst InstList | ε
-    public boolean InstList() {
-        if (Contains(currentToken, firstAssign) || Contains(currentToken, methodNames) || Match("if") || Match("for") ||  Match("switch") || Match("return")) {
-            res = Inst();
-            if (!res) {
-                System.out.println("Error in InstList: Inst() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return InstList();
-        }
-        return true;
-    }
-
-    /// Assign ; | Cond | For | Switch | Method ; | return Val ;
-    public boolean Inst() {
-        if(Match("return")){
-            currentToken = getNextToken();
-            res = Val();
-            if (!res) {
-                System.out.println("Error in Inst: Val() failed after return at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            res = Match(";");
-            if (res) {
-                currentToken = getNextToken();
-                return true;
-            }
-            System.out.println("Error in Inst: Expected ';' after return Val, found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        if(Contains(currentToken, firstAssign)) {
-            res = Assign();
-            if (!res) {
-                System.out.println("Error in Inst: Assign() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            res = Match(";");
-            if (res) {
-                currentToken = getNextToken();
-                return true;
-            }
-            System.out.println("Error in Inst: Expected ';' after Assign, found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        if(Match("if")) {
-            return Cond();
-        }
-        if(Match("for")) {
-            return For();
-        }
-        if(Match("switch")) {
-            return Switch();
-        }
-        if(Contains(currentToken, methodNames)) {
-            res = Method();
-            if (!res) {
-                System.out.println("Error in Inst: Method() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            res = Match(";");
-            if (res) {
-                currentToken = getNextToken();
-                return true;
-            }
-            System.out.println("Error in Inst: Expected ';' after Method, found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        System.out.println("Error in Inst: Unexpected token: " + currentToken + " (index: " + currentIndex + ")");
         return false;
     }
 
-    /// LogOp -> && | || | != | < | <= | > | >= | ==
-    public boolean LogOp() {
-        res = Contains(currentToken, logOp);
-        if (!res) {
-            System.out.println("Error in LogOp: Expected logical operator, found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+    /// InstList -> Inst InstList | ε
+    public AstNode InstList() {
+        AstNode listNode = new AstNode("InstList");
+        
+        while (Contains(currentToken, firstAssign) || Contains(currentToken, methodNames) || 
+               isMatch("if") || isMatch("for") || isMatch("switch") || isMatch("return")) {
+            AstNode inst = Inst();
+            if (inst == null) return null;
+            listNode.addChild(inst);
         }
-        currentToken = getNextToken();
-        return true;
+        return listNode;
     }
 
+    /// Inst -> Assign ; | Cond | For | Switch | Method ; | return Val ;
+    public AstNode Inst() {
+        if (isMatch("return")) {
+            consumeToken();
+            AstNode returnNode = new AstNode("Return");
+            AstNode val = Val();
+            if (val == null) return null;
+            returnNode.addChild(val);
+            if (!MatchAndConsume(";")) return null;
+            return returnNode;
+        }
+        
+        if (Contains(currentToken, firstAssign)) {
+            AstNode assignNode = Assign();
+            if (assignNode == null) return null;
+            if (!MatchAndConsume(";")) return null;
+            return assignNode;
+        }
+        
+        if (isMatch("if")) return Cond();
+        if (isMatch("for")) return For();
+        if (isMatch("switch")) return Switch();
+        
+        if (Contains(currentToken, methodNames)) {
+            AstNode methodNode = Method();
+            if (methodNode == null) return null;
+            if (!MatchAndConsume(";")) return null;
+            return methodNode;
+        }
+        
+        System.out.println("Unexpected token in Inst: " + currentToken);
+        return null;
+    }
 
+    /// Assign -> Type ident = Expr | ident = Expr
+    public AstNode Assign() {
+        // Check if it's a declaration (starts with Type) or assignment (starts with ID)
+        if (Contains(currentToken, dataTypes)) {
+            // Type ident = Expr
+            AstNode typeNode = Type(); // Consumes type
+            if (typeNode == null) return null;
+            
+            String id = currentToken;
+            if (!MatchAndConsume("ID")) return null;
+            
+            if (!MatchAndConsume("=")) return null;
+            
+            AstNode expr = Expr();
+            if (expr == null) return null;
+            
+            AstNode assignNode = new AstNode("Declaration");
+            assignNode.addChild(typeNode);
+            assignNode.addChild(new AstNode("Identifier", id));
+            assignNode.addChild(expr);
+            return assignNode;
+        } else {
+            // ident = Expr
+            String id = currentToken;
+            if (!MatchAndConsume("ID")) return null;
+            
+            if (!MatchAndConsume("=")) return null;
+            
+            AstNode expr = Expr();
+            if (expr == null) return null;
+            
+            AstNode assignNode = new AstNode("Assignment");
+            assignNode.addChild(new AstNode("Identifier", id));
+            assignNode.addChild(expr);
+            return assignNode;
+        }
+    }
 
-    /// Function -> Type ident ( FParam ) { InstList }
-    public boolean Function() {
-        res = Type();
-        if (!res) {
-            System.out.println("Error in Function: Type() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+    /// Cond -> if ( CondExp ) { InstList } Cond'
+    public AstNode Cond() {
+        if (!MatchAndConsume("if")) return null;
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode condNode = new AstNode("If");
+        AstNode condition = CondExp();
+        if (condition == null) return null;
+        condNode.addChild(condition);
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode thenBlock = InstList();
+        if (thenBlock == null) return null;
+        condNode.addChild(thenBlock);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        AstNode elsePart = CondPr();
+        if (elsePart != null) {
+            condNode.addChild(elsePart);
         }
-        res = Match("ID");
-        if (!res) {
-            System.out.println("Error in Function: Expected 'ID', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+        
+        return condNode;
+    }
+
+    /// Cond' -> ε | else Cond''
+    public AstNode CondPr() {
+        if (CheckAndConsume("else")) {
+            return CondPrPr();
         }
-        currentToken = getNextToken();
-        res = Match("(");
-        if (!res) {
-            System.out.println("Error in Function: Expected '(', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+        return null; // epsilon
+    }
+
+    /// Cond'' -> { InstList } | Cond
+    public AstNode CondPrPr() {
+        if (CheckAndConsume("{")) {
+            AstNode elseBlock = InstList();
+            if (elseBlock == null) return null;
+            
+            if (!MatchAndConsume("}")) return null;
+            return elseBlock;
         }
-        currentToken = getNextToken();
-        res = FParam();
-        if (!res) {
-            System.out.println("Error in Function: FParam() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+        return Cond(); // else if ...
+    }
+
+    /// For -> for ( Assign ; CondExp ; Incr ) { InstList }
+    public AstNode For() {
+        if (!MatchAndConsume("for")) return null;
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode forNode = new AstNode("For");
+        
+        AstNode init = Assign();
+        if (init == null) return null;
+        forNode.addChild(init);
+        
+        if (!MatchAndConsume(";")) return null;
+        
+        AstNode cond = CondExp();
+        if (cond == null) return null;
+        forNode.addChild(cond);
+        
+        if (!MatchAndConsume(";")) return null;
+        
+        AstNode incr = Incr();
+        if (incr == null) return null;
+        forNode.addChild(incr);
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode body = InstList();
+        if (body == null) return null;
+        forNode.addChild(body);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        return forNode;
+    }
+    
+    /// Incr -> ident Incr'
+    public AstNode Incr() {
+        String id = currentToken;
+        if (!MatchAndConsume("ID")) return null;
+        
+        // IncrPr returns the operation part
+        return IncrPr(id);
+    }
+    
+    /// Incr' -> = ident Op Val | OpIncr
+    public AstNode IncrPr(String id) {
+        if (CheckAndConsume("=")) {
+            // Assignment increment: i = i + 1
+            AstNode assignNode = new AstNode("Assignment");
+            assignNode.addChild(new AstNode("Identifier", id));
+            
+            // Parse RHS: ident Op Val
+            String rhsId = currentToken;
+            if (!MatchAndConsume("ID")) return null;
+            
+            String op = currentToken;
+            if (!Op()) return null; // Consumes op
+            
+            AstNode val = Val();
+            if (val == null) return null;
+            
+            AstNode exprNode = new AstNode("BinaryOp", op);
+            exprNode.addChild(new AstNode("Identifier", rhsId));
+            exprNode.addChild(val);
+            
+            assignNode.addChild(exprNode);
+            return assignNode;
+        } else {
+            // OpIncr: i++
+            String op = currentToken;
+            if (!OpIncr()) return null; // Consumes ++/--
+            
+            AstNode updateNode = new AstNode("Update", op);
+            updateNode.addChild(new AstNode("Identifier", id));
+            return updateNode;
         }
-        res = Match(")");
-        if (!res) {
-            System.out.println("Error in Function: Expected ')', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+    }
+    
+    /// Switch -> switch ( ident ) { CaseList default > InstList }
+    public AstNode Switch() {
+        if (!MatchAndConsume("switch")) return null;
+        if (!MatchAndConsume("(")) return null;
+        
+        String id = currentToken;
+        if (!MatchAndConsume("ID")) return null;
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode switchNode = new AstNode("Switch");
+        switchNode.addChild(new AstNode("Identifier", id));
+        
+        AstNode cases = new AstNode("Cases");
+        if (!CaseList(cases)) return null;
+        switchNode.addChild(cases);
+        
+        if (!MatchAndConsume("default")) return null;
+        if (!MatchAndConsume(">")) return null;
+        
+        AstNode defaultNode = new AstNode("Default");
+        AstNode defaultInst = InstList();
+        if (defaultInst == null) return null;
+        defaultNode.addChild(defaultInst);
+        switchNode.addChild(defaultNode);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        return switchNode;
+    }
+    
+    // CaseList helper
+    public boolean CaseList(AstNode parent) {
+        AstNode caseNode = Case();
+        if (caseNode == null) return false;
+        parent.addChild(caseNode);
+        
+        return CaseListPr(parent);
+    }
+    
+    public boolean CaseListPr(AstNode parent) {
+        if (isMatch("case")) {
+            return CaseList(parent);
         }
-        currentToken = getNextToken();
-        res = Match("{");
-        if (!res) {
-            System.out.println("Error in Function: Expected '{', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+        return true;
+    }
+    
+    /// Case -> case Val > InstList break ;
+    public AstNode Case() {
+        if (!MatchAndConsume("case")) return null;
+        
+        AstNode val = Val();
+        if (val == null) return null;
+        
+        if (!MatchAndConsume(">")) return null;
+        
+        AstNode body = InstList();
+        if (body == null) return null;
+        
+        if (!MatchAndConsume("break")) return null;
+        if (!MatchAndConsume(";")) return null;
+        
+        AstNode caseNode = new AstNode("Case");
+        caseNode.addChild(val);
+        caseNode.addChild(body);
+        return caseNode;
+    }
+
+    /// Expr -> Term Expr'
+    public AstNode Expr() {
+        AstNode lhs = Term();
+        if (lhs == null) return null;
+        return ExprPr(lhs);
+    }
+
+    /// Expr' -> + Term Expr' | - Term Expr' | ε
+    public AstNode ExprPr(AstNode lhs) {
+        if (Contains(currentToken, new String[]{"+", "-"})) {
+            String op = currentToken;
+            consumeToken();
+            AstNode rhs = Term();
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("BinaryOp", op);
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return ExprPr(newNode);
         }
-        currentToken = getNextToken();
-        res = InstList();
-        if (!res) {
-            System.out.println("Error in Function: InstList() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+        return lhs;
+    }
+
+    /// Term -> Factor Term'
+    public AstNode Term() {
+        AstNode lhs = Factor();
+        if (lhs == null) return null;
+        return TermPr(lhs);
+    }
+
+    /// Term' -> * Factor Term' | / Factor Term' | % Factor Term' | ε
+    public AstNode TermPr(AstNode lhs) {
+        if (Contains(currentToken, new String[]{"*", "/", "%"})) {
+            String op = currentToken;
+            consumeToken();
+            AstNode rhs = Factor();
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("BinaryOp", op);
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return TermPr(newNode);
         }
-        res = Match("}");
-        if (!res) {
-            System.out.println("Error in Function: Expected '}', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+        return lhs;
+    }
+
+    /// Factor -> ( CondExp ) CondExp' | Val Factor'
+    public AstNode Factor() {
+        if (CheckAndConsume("(")) {
+            AstNode node = CondExp();
+            if (node == null) return null;
+            if (!MatchAndConsume(")")) return null;
+            return CondExpPr(node);
         }
-        currentToken = getNextToken();
+        
+        AstNode val = Val();
+        if (val == null) return null;
+        return FactorPr(val);
+    }
+
+    /// Factor' -> ** Val | ε
+    public AstNode FactorPr(AstNode lhs) {
+        if (CheckAndConsume("**")) {
+            AstNode rhs = Val();
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("BinaryOp", "**");
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return newNode; 
+        }
+        return lhs;
+    }
+    
+    /// CondExp -> Expr CondExp'
+    public AstNode CondExp() {
+        AstNode lhs = Expr();
+        if (lhs == null) return null;
+        return CondExpPr(lhs);
+    }
+    
+    /// CondExp' -> LogOp CondExp | ε
+    public AstNode CondExpPr(AstNode lhs) {
+        if (Contains(currentToken, logOp)) {
+            String op = currentToken;
+            consumeToken();
+            AstNode rhs = CondExp(); // Recursive calls Expr -> ...
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("LogicOp", op);
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return newNode;
+        }
+        return lhs;
+    }
+
+    /// Val -> num | lit | Method | PI | INF | ident Val'
+    public AstNode Val() {
+        if (Contains(currentToken, vals)) { 
+            AstNode node = new AstNode("Value", currentToken);
+            consumeToken();
+            return node;
+        } else if (isMatch("ID")) {
+            String id = currentToken;
+            consumeToken();
+            AstNode idNode = new AstNode("Identifier", id);
+            
+            // Val' -> [ Val ] | ε
+            if (CheckAndConsume("[")) {
+                 AstNode index = Val();
+                 if (index == null) return null;
+                 if (!MatchAndConsume("]")) return null;
+                 
+                 AstNode arrayAccess = new AstNode("ArrayAccess");
+                 arrayAccess.addChild(idNode);
+                 arrayAccess.addChild(index);
+                 return arrayAccess;
+            }
+            return idNode;
+        } else if (Contains(currentToken, methodNames)) {
+            return Method();
+        }
+        return null;
+    }
+
+    /// Method -> MethodName ( Param )
+    public AstNode Method() {
+        String name = currentToken;
+        if (!MethodName()) return null; // Consumes name
+        
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode methodNode = new AstNode("MethodCall", name);
+        
+        if (!Param(methodNode)) return null;
+        
+        if (!MatchAndConsume(")")) return null;
+        return methodNode;
+    }
+
+    public boolean Param(AstNode parent) {
+        AstNode val = Val();
+        if (val == null) return false;
+        parent.addChild(val);
+        return ParamPr(parent);
+    }
+    
+    public boolean ParamPr(AstNode parent) {
+        if (CheckAndConsume(",")) {
+            return Param(parent);
+        }
         return true;
     }
 
     /// FParam -> ε | TypeIdent
-    private boolean FParam() {
-        if(Contains(currentToken, dataTypes)) {
-            return TypeIdent();
+    private boolean FParam(AstNode parent) {
+        if (Contains(currentToken, dataTypes)) {
+            return TypeIdent(parent);
         }
         return true;
     }
-
-
+    
     /// TypeIdent -> Type ident TypeIdent'
-    public boolean TypeIdent() {
-        res = Type();
-        if (!res) {
-            System.out.println("Error in TypeIdent: Type() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match("ID");
-        if (!res) {
-            System.out.println("Error in TypeIdent: Expected 'ID', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        return TypeIdentPr();
+    public boolean TypeIdent(AstNode parent) {
+        AstNode typeNode = Type();
+        if (typeNode == null) return false;
+        
+        String id = currentToken;
+        if (!MatchAndConsume("ID")) return false;
+        
+        AstNode param = new AstNode("Parameter");
+        param.addChild(typeNode);
+        param.addChild(new AstNode("Identifier", id));
+        parent.addChild(param);
+        
+        return TypeIdentPr(parent);
     }
-
-    /// TypeIdent' -> ε | , TypeIdent
-    public boolean TypeIdentPr(){
-        res = Match(",");
-        if (res) {
-            currentToken = getNextToken();
-            return TypeIdent();
+    
+    public boolean TypeIdentPr(AstNode parent) {
+        if (CheckAndConsume(",")) {
+            return TypeIdent(parent);
         }
         return true;
     }
 
+    // Helpers
+    
+    public boolean MethodName() {
+        if (Contains(currentToken, methodNames)) {
+            consumeToken();
+            return true;
+        }
+        return false;
+    }
 
-    /// Match non-terminals in a production rule with Terminal non-terminal Terminal style.
-    /// If true, advance to next token, else dont.
-    public boolean Match(String token) {
+    public boolean Op() {
+        if (Contains(currentToken, op)) {
+            consumeToken();
+            return true;
+        }
+        return false;
+    }
+    
+    public boolean OpIncr() {
+        if (Contains(currentToken, opIncr)) {
+            consumeToken();
+            return true;
+        }
+        return false;
+    }
+    
+    public boolean LogOp() {
+        if (Contains(currentToken, logOp)) {
+            consumeToken();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean MatchAndConsume(String token) {
+        if (token.equals(currentToken)) {
+            consumeToken();
+            return true;
+        }
+        System.out.println("Expected '" + token + "', found '" + currentToken + "' at index " + currentIndex);
+        return false;
+    }
+
+    private boolean CheckAndConsume(String token) {
+        if (token.equals(currentToken)) {
+            consumeToken();
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean isMatch(String token) {
+        return token.equals(currentToken);
+    }
+    
+    private boolean Match(String token) {
         return token.equals(currentToken);
     }
 
-    /// Get next token in the token arraylist
-    private String getNextToken() {
+    private void consumeToken() {
         currentIndex++;
-        if (currentIndex >= tokens.size()) {
-            System.out.println("No more tokens to analyze, this should not happen, I tink");
-            res = false;
-        }
-        return tokens.get(currentIndex);
-    }
-
-    /// Contains as if .NET, java is shit, does not have C# functions
-    private boolean Contains(String token, String[] stringsToCompareTo) {
-        if (token == null || stringsToCompareTo == null) {
-            return false;
-        }
-        for (String str : stringsToCompareTo) {
-            if (token.equals(str)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// Val -> num | lit | Method | PI | INF | ident Val'
-    public boolean Val() {
-        if (Contains(currentToken, vals)) {
-            currentToken = getNextToken();
-            return true;
-        } else if (Match("ID")) {
-            currentToken = getNextToken();
-            return ValPr();
+        if (currentIndex < tokens.size()) {
+            currentToken = tokens.get(currentIndex);
         } else {
-            res = Method();
-            if (!res) {
-                System.out.println("Error in Val: Method() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return true;
+            currentToken = "eof";
         }
     }
 
-    /// Method -> MethodName ( Param )
-    public boolean Method() {
-        res = MethodName();
-        if (!res) {
-            System.out.println("Error in Method: MethodName() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
+    private boolean Contains(String token, String[] list) {
+        if (token == null || list == null) return false;
+        for (String s : list) {
+            if (token.equals(s)) return true;
         }
-        res = Match("(");
-        if (!res) {
-            System.out.println("Error in Method: Expected '(', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Param();
-        if (!res) {
-            System.out.println("Error in Method: Param() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match(")");
-        if (res) {
-            currentToken = getNextToken();
-            return true;
-        }
-        System.out.println("Error in Method: Expected ')', found: " + currentToken + " (index: " + currentIndex + ")");
         return false;
-    }
-
-    /// Param -> Val Param'
-    public boolean Param() {
-        res = Val();
-        if (!res) {
-            System.out.println("Error in Param: Val() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return ParamPr();
-    }
-
-    ///  Param' -> ε | , Param
-    public boolean ParamPr() {
-        res = Match(",");
-        if (res) {
-            currentToken = getNextToken();
-            return Param();
-        }
-        return true;
-    }
-
-    /// Val' -> ε | [ *num ]
-    public boolean ValPr() {
-        res = Match("[");
-        if (res) {
-            currentToken = getNextToken();
-            res = Val();
-            if (!res) {
-                System.out.println("Error in ValPr: Val() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            res = Match("]");
-            if (res) {
-                currentToken = getNextToken();
-                return true;
-            }
-            System.out.println("Error in ValPr: Expected ']', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return true;
-    }
-
-    /// OpIncr -> ++ | - -
-    public boolean OpIncr() {
-        res = Contains(currentToken, opIncr);
-        if (!res) {
-            System.out.println("Error in OpIncr: Expected '++' or '--', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        return true;
-    }
-
-    /// Expr -> Term Expr'
-    public boolean Expr() {
-        res = Term();
-        if (!res) {
-            System.out.println("Error in Expr: Term() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return ExprPr();
-    }
-
-    /// Term -> Factor Term'
-    public boolean Term() {
-        res = Factor();
-        if (!res) {
-            System.out.println("Error in Term: Factor() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return TermPr();
-    }
-
-    /// Factor -> ( CondExp ) CondExp' | Val Factor'
-    public boolean Factor() {
-        res = Match("(");
-        if (res) {
-            currentToken = getNextToken();
-            res = CondExp();
-            if (!res) {
-                System.out.println("Error in Factor: CondExp() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            res = Match(")");
-            if  (!res) {
-                System.out.println("Error in Factor: Expected ')', found: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            currentToken = getNextToken();
-            return CondExpPr();
-        }
-        res = Val();
-        if (!res) {
-            System.out.println("Error in Factor: Val() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return FactorPr();
-    }
-
-    /// Expr' -> + Term Expr' | - Term Expr' | ε
-    public boolean ExprPr() {
-        String []  masmenos = {"+","-"};
-        if(Contains(currentToken ,masmenos)){
-            currentToken = getNextToken();
-            res = Term();
-            if (!res) {
-                System.out.println("Error in ExprPr: Term() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return ExprPr();
-        }
-        return true;
-    }
-
-    /// Term' -> * Factor Term' | / Factor Term' | % Factor Term' | ε
-    public boolean TermPr(){
-        String[] prdivmod = {"*", "/", "%"};
-        if(Contains(currentToken ,prdivmod)){
-            currentToken = getNextToken();
-            res = Factor();
-            if (!res) {
-                System.out.println("Error in TermPr: Factor() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return TermPr();
-        }
-        return true;
-    }
-
-    /// Factor' -> ** Val | ε
-    public boolean FactorPr(){
-        res = Match("**");
-        if (res) {
-            currentToken = getNextToken();
-            res = Val();
-            if (!res) {
-                System.out.println("Error in FactorPr: Val() failed after '**' at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return true;
-        }
-        return true;
-    }
-
-    /// CondExp -> Expr CondExp'
-    public boolean CondExp(){
-        res = Expr();
-        if (!res) {
-            System.out.println("Error in CondExp: Expr() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return CondExpPr();
-    }
-
-    /// CondExp' -> LogOp CondExp | ε
-    public boolean CondExpPr(){
-        if(Contains(currentToken, logOp)) {
-            res = LogOp();
-            if (!res) {
-                System.out.println("Error in CondExpPr: LogOp() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return CondExp();
-        }
-        return true;
-    }
-
-    /// Cond -> if ( CondExp ) { InstList } Cond'
-    public boolean Cond() {
-        res = Match("if");
-        if (!res) {
-            System.out.println("Error in Cond: Expected 'if', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("(");
-        if (!res) {
-            System.out.println("Error in Cond: Expected '(', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = CondExp();
-        if (!res) {
-            System.out.println("Error in Cond: CondExp() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match(")");
-        if (!res) {
-            System.out.println("Error in Cond: Expected ')', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("{");
-        if (!res) {
-            System.out.println("Error in Cond: Expected '{', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = InstList();
-        if (!res) {
-            System.out.println("Error in Cond: InstList() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match("}");
-        if (!res) {
-            System.out.println("Error in Cond: Expected '}', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        return CondPr();
-    }
-
-    /// Cond' -> ε | else Cond''
-    public boolean CondPr(){
-        if(Match("else")){
-            currentToken = getNextToken();
-            return CondPrPr();
-        }
-        return true;
-    }
-
-    /// Cond'' -> { InstList } | Cond
-    public boolean CondPrPr(){
-        if(Match("{")){
-            currentToken = getNextToken();
-            res = InstList();
-            if (!res) {
-                System.out.println("Error in CondPrPr: InstList() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            res = Match("}");
-            if (res) {
-                currentToken = getNextToken();
-                return true;
-            }
-            System.out.println("Error in CondPrPr: Expected '}', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return Cond();
-    }
-
-    /// For -> for ( Assign ; CondExp ; Incr ) { InstList }
-    public boolean For() {
-        res = Match("for");
-        if (!res) {
-            System.out.println("Error in For: Expected 'for', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("(");
-        if (!res) {
-            System.out.println("Error in For: Expected '(', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Assign();
-        if (!res) {
-            System.out.println("Error in For: Assign() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match(";");
-        if (!res) {
-            System.out.println("Error in For: Expected ';', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = CondExp();
-        if (!res) {
-            System.out.println("Error in For: CondExp() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match(";");
-        if (!res) {
-            System.out.println("Error in For: Expected ';', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Incr();
-        if (!res) {
-            System.out.println("Error in For: Incr() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match(")");
-        if (!res) {
-            System.out.println("Error in For: Expected ')', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("{");
-        if (!res) {
-            System.out.println("Error in For: Expected '{', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = InstList();
-        if (!res) {
-            System.out.println("Error in For: InstList() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match("}");
-        if (res) {
-            currentToken = getNextToken();
-            return true;
-        }
-        System.out.println("Error in For: Expected '}', found: " + currentToken + " (index: " + currentIndex + ")");
-        return false;
-    }
-
-    /// Switch -> switch ( ident ) { CaseList default > InstList }
-    public boolean Switch() {
-        res = Match("switch");
-        if (!res) {
-            System.out.println("Error in Switch: Expected 'switch', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("(");
-        if (!res) {
-            System.out.println("Error in Switch: Expected '(', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("ID");
-        if (!res) {
-            System.out.println("Error in Switch: Expected 'ID', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match(")");
-        if (!res) {
-            System.out.println("Error in Switch: Expected ')', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("{");
-        if (!res) {
-            System.out.println("Error in Switch: Expected '{', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = CaseList();
-        if (!res) {
-            System.out.println("Error in Switch: CaseList() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match("default");
-        if (!res) {
-            System.out.println("Error in Switch: Expected 'default', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match(">");
-        if (!res) {
-            System.out.println("Error in Switch: Expected '>', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = InstList();
-        if (!res) {
-            System.out.println("Error in Switch: InstList() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match("}");
-        if (res) {
-            currentToken = getNextToken();
-            return true;
-        }
-        System.out.println("Error in Switch: Expected '}', found: " + currentToken + " (index: " + currentIndex + ")");
-        return false;
-    }
-
-    /// CaseList -> Case CaseList'
-    public boolean CaseList() {
-        res = Case();
-        if (!res) {
-            System.out.println("Error in CaseList: Case() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return CaseListPr();
-    }
-
-    /// CaseList' -> ε | CaseList
-    public boolean CaseListPr(){
-        if(Match("case")){
-            currentToken = getNextToken();
-            return CaseList();
-        }
-        return true;
-    }
-
-    /// Case -> case Val > InstList break ;
-    public boolean Case(){
-        res = Match("case");
-        if (!res) {
-            System.out.println("Error in Case: Expected 'case', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Val();
-        if (!res) {
-            System.out.println("Error in Case: Val() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match(">");
-        if (!res) {
-            System.out.println("Error in Case: Expected '>', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = InstList();
-        if (!res) {
-            System.out.println("Error in Case: InstList() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res =  Match("break");
-        if (!res) {
-            System.out.println("Error in Case: Expected 'break', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match(";");
-        if (res) {
-            currentToken = getNextToken();
-            return true;
-        }
-        System.out.println("Error in Case: Expected ';', found: " + currentToken + " (index: " + currentIndex + ")");
-        return false;
-    }
-
-    /// Incr -> ident Incr'
-    public boolean Incr() {
-        res = Match("ID");
-        if (!res) {
-            System.out.println("Error in Incr: Expected 'ID', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        return IncrPr();
-    }
-
-    /// Incr' -> = ident Op Val | OpIncr
-    public boolean IncrPr(){
-        if (Match("=")){
-            currentToken = getNextToken();
-            res = Match("ID");
-            if (!res) {
-                System.out.println("Error in IncrPr: Expected 'ID', found: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            currentToken = getNextToken();
-            res = Op();
-            if (!res) {
-                System.out.println("Error in IncrPr: Op() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            res = Val();
-            if (!res) {
-                System.out.println("Error in IncrPr: Val() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return true;
-        }
-        return OpIncr();
-    }
-
-    /// Assign -> Type ident = Expr | ident = Expr
-    public boolean Assign() {
-        if(Match("ID")){
-            currentToken = getNextToken();
-            res = Match("=");
-            if  (!res) {
-                System.out.println("Error in Assign: Expected '=', found: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            currentToken = getNextToken();
-            res = Expr();
-            if (!res) {
-                System.out.println("Error in Assign: Expr() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-                return false;
-            }
-            return true;
-        }
-        res = Type();
-        if (!res) {
-            System.out.println("Error in Assign: Type() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        res = Match("ID");
-        if (!res) {
-            System.out.println("Error in Assign: Expected 'ID', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Match("=");
-        if (!res) {
-            System.out.println("Error in Assign: Expected '=', found: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        currentToken = getNextToken();
-        res = Expr();
-        if (!res) {
-            System.out.println("Error in Assign: Expr() failed at token: " + currentToken + " (index: " + currentIndex + ")");
-            return false;
-        }
-        return true;
     }
 }
-
-
