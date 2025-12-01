@@ -325,7 +325,7 @@ internal class Program
 
     static void Main(string[] args)
     {
-        Scanner scanner = new Scanner("C:\\Users\\jqr_0\\source\\repos\\AutomatasFinal\\FilePruebas.txt");
+        Scanner scanner = new Scanner("FilePruebas.txt");
        
         //Se hace un lista de tokens con el string
         List<(string, string)> tokens = GetTokens(scanner.getInput());

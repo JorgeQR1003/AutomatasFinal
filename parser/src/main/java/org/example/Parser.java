@@ -1,14 +1,14 @@
 package org.example;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.AbstractMap.SimpleEntry;
 
 public class Parser {
-    private final List<String> tokens;
+    private final List<Entry<String, String>> tokens;
     private String currentToken;
     private int currentIndex;
-    // private boolean res; // No longer used as primary success indicator
     
     private String[] dataTypes = {"string", "void", "int", "bool", "char", "double"};
     private String[] firstAssign = {"string", "void", "int", "bool", "char", "double", "ID"};
@@ -17,13 +17,12 @@ public class Parser {
     private String[] op = {"+", "-", "*", "/", "%", "**"};
     private String[] vals = {"NUM", "LITERAL", "INF", "PI"};
     private String[] opIncr = {"++", "--"};
-    // private String[] syntacticWords = {"{", "}", "(", ")", "[", "]", ";", "," };
 
-    public Parser(String[] tokens) {
-        this.tokens = new ArrayList<>(Arrays.asList(tokens));
-        this.tokens.add("eof");
+    public Parser(List<Entry<String, String>> tokens) {
+        this.tokens = tokens;
+        this.tokens.add(new SimpleEntry<String, String>("eof", "eof"));
         this.currentIndex = 0;
-        this.currentToken = this.tokens.get(currentIndex);
+        this.currentToken = this.tokens.get(currentIndex).getKey();
     }
 
     public AstNode Parse() {
@@ -67,7 +66,7 @@ public class Parser {
             System.out.println("Error in Function: Expected ID");
             return null;
         }
-        String funcName = tokens.get(currentIndex - 1); // Previous token was the ID
+        String funcName = tokens.get(currentIndex).getValue(); // Previous token was the ID
         funcNode.addChild(new AstNode("Identifier", funcName));
         
         consumeToken(); 
@@ -176,7 +175,7 @@ public class Parser {
             AstNode typeNode = Type(); // Consumes type
             if (typeNode == null) return null;
             
-            String id = currentToken;
+            String id = tokens.get(currentIndex).getValue();
             if (!MatchAndConsume("ID")) return null;
             
             if (!MatchAndConsume("=")) return null;
@@ -191,7 +190,7 @@ public class Parser {
             return assignNode;
         } else {
             // ident = Expr
-            String id = currentToken;
+            String id = tokens.get(currentIndex).getValue();
             if (!MatchAndConsume("ID")) return null;
             
             if (!MatchAndConsume("=")) return null;
@@ -290,7 +289,7 @@ public class Parser {
     
     /// Incr -> ident Incr'
     public AstNode Incr() {
-        String id = currentToken;
+        String id = tokens.get(currentIndex).getValue();
         if (!MatchAndConsume("ID")) return null;
         
         // IncrPr returns the operation part
@@ -305,7 +304,7 @@ public class Parser {
             assignNode.addChild(new AstNode("Identifier", id));
             
             // Parse RHS: ident Op Val
-            String rhsId = currentToken;
+            String rhsId = tokens.get(currentIndex).getValue();
             if (!MatchAndConsume("ID")) return null;
             
             String op = currentToken;
@@ -336,7 +335,7 @@ public class Parser {
         if (!MatchAndConsume("switch")) return null;
         if (!MatchAndConsume("(")) return null;
         
-        String id = currentToken;
+        String id = tokens.get(currentIndex).getValue();
         if (!MatchAndConsume("ID")) return null;
         
         if (!MatchAndConsume(")")) return null;
@@ -500,11 +499,11 @@ public class Parser {
     /// Val -> num | lit | Method | PI | INF | ident Val'
     public AstNode Val() {
         if (Contains(currentToken, vals)) { 
-            AstNode node = new AstNode("Value", currentToken);
+            AstNode node = new AstNode("Value", tokens.get(currentIndex).getValue());
             consumeToken();
             return node;
         } else if (isMatch("ID")) {
-            String id = currentToken;
+            String id = tokens.get(currentIndex).getValue();
             consumeToken();
             AstNode idNode = new AstNode("Identifier", id);
             
@@ -568,7 +567,7 @@ public class Parser {
         AstNode typeNode = Type();
         if (typeNode == null) return false;
         
-        String id = currentToken;
+        String id = tokens.get(currentIndex).getValue();
         if (!MatchAndConsume("ID")) return false;
         
         AstNode param = new AstNode("Parameter");
@@ -648,7 +647,7 @@ public class Parser {
     private void consumeToken() {
         currentIndex++;
         if (currentIndex < tokens.size()) {
-            currentToken = tokens.get(currentIndex);
+            currentToken = tokens.get(currentIndex).getKey();
         } else {
             currentToken = "eof";
         }
