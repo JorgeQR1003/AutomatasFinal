@@ -19,29 +19,46 @@ public class Main {
 
 
     public static void main(String[] args) {
-        // Test 1: Función simple con asignaciones y operaciones
-        // int main() { int a = 10; a = b + 5 * 2; return 1; }
+        // Test 1: Tres funciones cortas
+        // int add() { return 5; }
+        // void greet() { Show("Hello"); }
+        // int getNum() { int x = 10; return x; }
         List<Entry<String, String>> test1 = createTokenList(
+            // Función 1: int add() { return 5; }
             "int", "int",
-            "ID", "main",
+            "ID", "add",
+            "(", "(",
+            ")", ")",
+            "{", "{",
+            "return", "return",
+            "NUM", "5",
+            ";", ";",
+            "}", "}",
+            // Función 2: void greet() { Show("Hello"); }
+            "void", "void",
+            "ID", "greet",
+            "(", "(",
+            ")", ")",
+            "{", "{",
+            "Show", "Show",
+            "(", "(",
+            "LITERAL", "Hello",
+            ")", ")",
+            ";", ";",
+            "}", "}",
+            // Función 3: int getNum() { int x = 10; return x; }
+            "int", "int",
+            "ID", "getNum",
             "(", "(",
             ")", ")",
             "{", "{",
             "int", "int",
-            "ID", "a",
+            "ID", "x",
             "=", "=",
             "NUM", "10",
             ";", ";",
-            "ID", "a",
-            "=", "=",
-            "ID", "b",
-            "+", "+",
-            "NUM", "5",
-            "*", "*",
-            "NUM", "2",
-            ";", ";",
             "return", "return",
-            "NUM", "1",
+            "ID", "x",
             ";", ";",
             "}", "}"
         );

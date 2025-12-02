@@ -6,7 +6,7 @@ import java.util.List;
 public class AstNode {
     private String label;      // e.g., "Function", "If", "Assign", "BinaryOp"
     private String value;      // e.g., "+", "10", "myVar" (optional)
-    private List<AstNode> children;
+    public List<AstNode> children;
 
     public AstNode(String label) {
         this(label, "");
