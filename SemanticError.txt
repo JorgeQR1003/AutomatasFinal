@@ -1,0 +1,9 @@
+int main() {
+    int x = 10;
+    string s = "Hello";
+    
+    </ Error Semantico: No se puede asignar (int + string) a una variable int >
+    int z = x + s; 
+
+    return 0;
+}

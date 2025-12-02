@@ -1,0 +1,25 @@
+void myFunction(int x) {
+    Show(x);
+}
+
+int main() {
+    int x = 10;
+    int y = 5;
+    string msg = "Start";
+
+    Show(msg);
+
+    if (x > y) {
+        x = x - 1;
+    } else {
+        x = x + 1;
+    }
+
+    for (int i = 0; i < 5; i++) {
+        Show(i);
+    }
+
+    myFunction(x);
+
+    return 0;
+}

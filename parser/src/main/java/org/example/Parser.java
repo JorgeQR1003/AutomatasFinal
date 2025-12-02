@@ -549,9 +549,6 @@ public class Parser {
             }
             return idNode;
         } else if (Contains(currentToken, methodNames)) {
-            // Method call as value: MethodName ( Param )
-            // We can reuse the logic from Assign (Case 2) or duplicate it here simpler.
-            // Since Method() was removed, implement inline or helper.
             String name = currentToken;
             consumeToken(); 
             

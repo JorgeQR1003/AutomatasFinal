@@ -328,7 +328,7 @@ internal class Program
 
     static void Main(string[] args)
     {
-        Scanner scanner = new Scanner("FilePruebas.txt");
+        Scanner scanner = new Scanner("Correct.txt");
        
         //Se hace un lista de tokens con el string
         List<(string, string)> tokens = GetTokens(scanner.getInput());
