@@ -1,34 +1,31 @@
-</ Codigo de prueba >
-int Main() {
-    string mensaje = "Hola mundo";
-    bool activo = 0;
-    char simbolo = "x";
-    
-    resultado = 10 + 5 * 2;
-    division = resultado / 4;
-    modulo = 15 % 4;
-    
-    contador = contador + 1;
-    valor = valor - 1;
-    
-    if (resultado > 10 && activo == 1) {
-        Show("Mayor que 10");
-    } else if (resultado == 10 && activo == 1){
-        Show("Igual");
+void myFunction(int x) {
+    Show(x);
+}
+
+int main() {
+    int x = 10;
+    int y = 5;
+    bool flag = 1;
+    string msg = "Start";
+
+    Show(msg);
+
+    if (x > y) {
+        x = x - 1;
     } else {
-        Show("Menor");
+        x = x + 1;
     }
-    
-    for (i = 0; i < 10; i = i + 1) {
-        if (i == 5) {
-            break;
-        }
+
+    for (int i = 0; i < 5; i++) {
         Show(i);
+        if (i == 3) {
+            Show("Gibran kk");
+        }
     }
-    
-    case (opcion) {
-        return 1;
-    }
-    
+
+    continue
+    Continue
+    myFunction(x);
+
     return 0;
 }

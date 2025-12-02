@@ -151,7 +151,7 @@ public class Parser {
             return returnNode;
         }
         
-        if (Contains(currentToken, firstAssign)) {
+        if (Contains(currentToken, firstAssign) || Contains(currentToken, methodNames)) {
             AstNode assignNode = Assign();
             if (assignNode == null) return null;
             if (!MatchAndConsume(";")) return null;
@@ -162,23 +162,15 @@ public class Parser {
         if (isMatch("for")) return For();
         if (isMatch("switch")) return Switch();
         
-        if (Contains(currentToken, methodNames)) {
-            AstNode methodNode = Method();
-            if (methodNode == null) return null;
-            if (!MatchAndConsume(";")) return null;
-            return methodNode;
-        }
-        
         System.out.println("Unexpected token in Inst: " + currentToken);
         return null;
     }
 
-    /// Assign -> Type ident = Expr | ident = Expr
+    /// Assign -> Type ident = Expr | ident Assign' | MethodName ( Param )
     public AstNode Assign() {
-        // Check if it's a declaration (starts with Type) or assignment (starts with ID)
+        // Case 1: Declaration -> Type ident = Expr
         if (Contains(currentToken, dataTypes)) {
-            // Type ident = Expr
-            AstNode typeNode = Type(); // Consumes type
+            AstNode typeNode = Type(); 
             if (typeNode == null) return null;
             
             String id = tokens.get(currentIndex).getValue();
@@ -194,13 +186,34 @@ public class Parser {
             assignNode.addChild(new AstNode("Identifier", id));
             assignNode.addChild(expr);
             return assignNode;
-        } else {
-            // ident = Expr
+        } 
+        // Case 2: Built-in Method Call -> MethodName ( Param )
+        else if (Contains(currentToken, methodNames)) {
+            String name = currentToken;
+            consumeToken(); // Consume MethodName
+            
+            if (!MatchAndConsume("(")) return null;
+            
+            AstNode methodNode = new AstNode("MethodCall", name);
+            
+            if (!Param(methodNode)) return null;
+            
+            if (!MatchAndConsume(")")) return null;
+            return methodNode;
+        }
+        // Case 3: Assignment or User Method -> ident Assign'
+        else if (isMatch("ID")) {
             String id = tokens.get(currentIndex).getValue();
-            if (!MatchAndConsume("ID")) return null;
-            
-            if (!MatchAndConsume("=")) return null;
-            
+            consumeToken(); // Consume ID
+            return AssignPr(id);
+        }
+        return null;
+    }
+
+    /// Assign' -> = Expr | ( Param )
+    public AstNode AssignPr(String id) {
+        if (CheckAndConsume("=")) {
+            // Assignment: id = Expr
             AstNode expr = Expr();
             if (expr == null) return null;
             
@@ -208,7 +221,17 @@ public class Parser {
             assignNode.addChild(new AstNode("Identifier", id));
             assignNode.addChild(expr);
             return assignNode;
+        } else if (CheckAndConsume("(")) {
+            // Method Call: id ( Param )
+            AstNode methodNode = new AstNode("MethodCall", id);
+            
+            if (!Param(methodNode)) return null;
+            
+            if (!MatchAndConsume(")")) return null;
+            return methodNode;
         }
+        System.out.println("Error in Assign': Expected '=' or '(' after identifier " + id);
+        return null;
     }
 
     /// Cond -> if ( CondExp ) { InstList } Cond'
@@ -526,24 +549,22 @@ public class Parser {
             }
             return idNode;
         } else if (Contains(currentToken, methodNames)) {
-            return Method();
+            // Method call as value: MethodName ( Param )
+            // We can reuse the logic from Assign (Case 2) or duplicate it here simpler.
+            // Since Method() was removed, implement inline or helper.
+            String name = currentToken;
+            consumeToken(); 
+            
+            if (!MatchAndConsume("(")) return null;
+            
+            AstNode methodNode = new AstNode("MethodCall", name);
+            
+            if (!Param(methodNode)) return null;
+            
+            if (!MatchAndConsume(")")) return null;
+            return methodNode;
         }
         return null;
-    }
-
-    /// Method -> MethodName ( Param )
-    public AstNode Method() {
-        String name = currentToken;
-        if (!MethodName()) return null; // Consumes name
-        
-        if (!MatchAndConsume("(")) return null;
-        
-        AstNode methodNode = new AstNode("MethodCall", name);
-        
-        if (!Param(methodNode)) return null;
-        
-        if (!MatchAndConsume(")")) return null;
-        return methodNode;
     }
 
     public boolean Param(AstNode parent) {

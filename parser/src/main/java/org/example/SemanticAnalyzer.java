@@ -145,8 +145,9 @@ public class SemanticAnalyzer {
     private void checkIf(AstNode ifNode) {
         AstNode condition = ifNode.getChildren().get(0);
         String condType = getExpressionType(condition);
-        if (!"bool".equals(condType)) {
-             System.out.println("Error: If condition must be boolean. Got " + condType);
+        // Condition can be bool OR int (treating 0/1 as bool)
+        if (!"bool".equals(condType) && !"int".equals(condType)) {
+             System.out.println("Error: If condition must be boolean or int (0/1). Got " + condType);
         }
 
         symbolTable.enterScope();
@@ -175,8 +176,9 @@ public class SemanticAnalyzer {
 
         AstNode condition = forNode.getChildren().get(1);
         String condType = getExpressionType(condition);
-        if (!"bool".equals(condType)) {
-            System.out.println("Error: For condition must be boolean. Got " + condType);
+        // Condition can be bool OR int (treating 0/1 as bool)
+        if (!"bool".equals(condType) && !"int".equals(condType)) {
+            System.out.println("Error: For condition must be boolean or int (0/1). Got " + condType);
         }
 
         AstNode update = forNode.getChildren().get(2);
@@ -201,6 +203,13 @@ public class SemanticAnalyzer {
         if (symbolTable.findSymbol(name) == null) {
              System.out.println("Error: Undefined function '" + name + "'");
         }
+        
+        // Note: Parameter type check could be added here if we stored function signatures
+        // For now, we only check if the function/identifier exists.
+        // The production rule change allows "id ( Param )" which creates a MethodCall node.
+        // This means name could be a variable holding a function pointer (if language supported it) 
+        // or just a regular function name.
+        // Since we only store (Name -> ReturnType), we check existence.
     }
 
     private String getExpressionType(AstNode node) {
@@ -216,11 +225,17 @@ public class SemanticAnalyzer {
             return "unknown";
         } else if ("Value".equals(label)) {
             String val = node.getValue();
-            if (val.matches("-?\\d+")) return "int";
+            // Special case: 0 and 1 can be int OR bool.
+            // Standard identification:
+            if (val.matches("-?\\d+")) return "int"; 
+            // Note: We can't definitively say "bool" here just by looking at "1".
+            // It's context dependent. But getExpressionType tries to be context-free.
+            // We will handle this in compatibility checks.
+            
             if (val.matches("-?\\d*\\.\\d+")) return "double";
             if (val.startsWith("\"")) return "string";
             if (val.startsWith("'")) return "char";
-            if ("true".equals(val) || "false".equals(val)) return "bool";
+            // "true" and "false" removed as per user statement "we don't have that"
             return "unknown";
         } else if ("BinaryOp".equals(label)) {
             String op = node.getValue();
@@ -259,6 +274,8 @@ public class SemanticAnalyzer {
     private boolean isCompatible(String expected, String actual) {
         if ("unknown".equals(expected) || "unknown".equals(actual)) return true; 
         if (expected.equals(actual)) return true;
+        // Allow int (0 or 1) to be compatible with bool
+        if ("bool".equals(expected) && "int".equals(actual)) return true; 
         return false;
     }
 
