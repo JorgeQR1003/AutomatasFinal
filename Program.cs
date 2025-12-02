@@ -1,7 +1,8 @@
-﻿using System;
+﻿using AnalizadorLexico;
+using System;
 using System.Collections.Generic;
 using System.Security;
-using AnalizadorLexico;
+using System.Text.Json;
 
 internal class Program
 {
@@ -323,9 +324,18 @@ internal class Program
         }
     }
 
+    public static void SaveTokensToJson(List<(string, string)> tokens, string filePath)
+    {
+        var tokenList = tokens.Select(t => new { token = t.Item1, lexema = t.Item2 }).ToList();
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        string json = JsonSerializer.Serialize(tokenList, options);
+        File.WriteAllText(filePath, json);
+    }
+
+
     static void Main(string[] args)
     {
-        Scanner scanner = new Scanner("C:\\Users\\jqr_0\\source\\repos\\AutomatasFinal\\FilePruebas.txt");
+        Scanner scanner = new Scanner("..//..//..//FilePruebas.txt");
        
         //Se hace un lista de tokens con el string
         List<(string, string)> tokens = GetTokens(scanner.getInput());
@@ -333,6 +343,7 @@ internal class Program
         //Se verifica si la lista de tokens es vacia
         if (tokens.Count == 0)
         {
+            Console.WriteLine("No se pudo tokenizar la expresion");
             return;
         }
 
@@ -343,6 +354,12 @@ internal class Program
             Console.WriteLine($" {token} : {lexema}");
         }
         Console.WriteLine();
+
+        //Se guarda la lista de tokens en un archivo JSON
+        string outputPath = "..//..//..//tokens.json";
+        SaveTokensToJson(tokens, outputPath);
+        Console.WriteLine($"Tokens guardados en: {outputPath}");
+
 
         Console.ReadKey();
     }
