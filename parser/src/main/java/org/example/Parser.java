@@ -1,386 +1,663 @@
 package org.example;
 
-import java.util.Arrays;
+
 import java.util.List;
-import java.util.Objects;
+import java.util.Map.Entry;
+import java.util.AbstractMap.SimpleEntry;
 
 public class Parser {
-    private final List<String> tokens;
+    private final List<Entry<String, String>> tokens;
     private String currentToken;
     private int currentIndex;
-    private boolean res;
-
+    
     private String[] dataTypes = {"string", "void", "int", "bool", "char", "double"};
+    private String[] firstAssign = {"string", "void", "int", "bool", "char", "double", "ID"};
     private String[] methodNames = {"Show", "Input", "Genf", "Deriv", "DerivX", "Integ", "IntegX", "Graph", "Slope", "Tab", "Root", "RootX", "Sen", "Cos", "Tan", "Sec", "Csc", "Cot", "Limit", "Concat", "Dist"};
     private String[] logOp = {"&&", "||", "!=", "==", "<=", ">=", "<", ">"};
     private String[] op = {"+", "-", "*", "/", "%", "**"};
     private String[] vals = {"NUM", "LITERAL", "INF", "PI"};
     private String[] opIncr = {"++", "--"};
 
-
-    public Parser(String[] tokens) {
-        this.tokens = Arrays.asList(tokens);
-        this.tokens.add(0, "placeholder, just for pseudo inspo to work");
-        this.tokens.add(-1, "eof");
-        this.res = false;
+    public Parser(List<Entry<String, String>> tokens) {
+        this.tokens = tokens;
+        this.tokens.add(new SimpleEntry<String, String>("eof", "eof"));
         this.currentIndex = 0;
-        this.currentToken = this.tokens.get(currentIndex);
+        this.currentToken = this.tokens.get(currentIndex).getKey();
+    }
+
+    public AstNode Parse() {
+        System.out.println("Starting parse...");
+        AstNode root = Program();
+        if (root != null && currentToken.equals("eof")) {
+            System.out.println("Program parsed successfully");
+            return root;
+        } else {
+            System.out.println("Error: Program failed to parse. Unexpected token: " + currentToken);
+            return null;
+        }
     }
 
     /// Program -> Function Program | ε
-    public boolean Program() {
-        currentToken = getNextToken();
-        res = Function();
-        if (!res) {
-            return false;
-        } else {
-            return Program();
+    public AstNode Program() {
+        AstNode programNode = new AstNode("Program");
+        
+        while (Contains(currentToken, dataTypes)) {
+            AstNode funcNode = Function();
+            if (funcNode == null) {
+                return null;
+            }
+            programNode.addChild(funcNode);
         }
+        
+        return programNode;
     }
 
-    /// Type -> TypeVal Type’
-    public boolean Type() {
-        res = TypeVal();
-        if (!res) {
-            return false;
+    /// Function -> Type ident ( FParam ) { InstList }
+    public AstNode Function() {
+        AstNode funcNode = new AstNode("Function");
+        
+        // Type
+        AstNode typeNode = Type();
+        if (typeNode == null) return null;
+        funcNode.addChild(typeNode);
+        
+        // ID
+        if (!Match("ID")) {
+            System.out.println("Error in Function: Expected ID");
+            return null;
         }
-        return TypePr();
+        String funcName = tokens.get(currentIndex).getValue(); // Previous token was the ID
+        funcNode.addChild(new AstNode("Identifier", funcName));
+        
+        consumeToken(); 
+        
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode paramsNode = new AstNode("Parameters");
+        if (!FParam(paramsNode)) return null;
+        funcNode.addChild(paramsNode);
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode bodyNode = InstList();
+        if (bodyNode == null) return null;
+        funcNode.addChild(bodyNode);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        return funcNode;
     }
 
-    /// Type’ -> ε | [ ]
-    public boolean TypePr(){
-        res = Match("[");
-        if (res) {
-            return Match("]");
+    /// Type -> TypeVal Type'
+    public AstNode Type() {
+        String baseType = currentToken;
+        if (!TypeVal()) return null;
+        
+        String suffix = TypePr(); // Returns "[]" or ""
+        if (suffix == null) return null;
+        
+        return new AstNode("Type", baseType + suffix);
+    }
+
+    /// Type' -> ε | [ ]
+    public String TypePr() {
+        if (CheckAndConsume("[")) {
+            if (MatchAndConsume("]")) {
+                return "[]";
+            }
+            return null;
         }
-        return true;
+        return "";
     }
 
     /// TypeVal -> void | string | int | double | char | bool
     public boolean TypeVal() {
-        res = Contains(currentToken, dataTypes);
-        if (!res) {
-            return false;
+        if (Contains(currentToken, dataTypes)) {
+            consumeToken();
+            return true;
         }
-        currentToken = getNextToken();
-        return true;
-    }
-
-    /// Op -> + | - | / | * | % | **
-    public boolean Op() {
-        res = Contains(currentToken, op);
-        if (!res) {
-            return false;
-        }
-        currentToken = getNextToken();
-        return true;
-    }
-
-    //MethodName -> Show | Graph | Deriv | DerivX | Integ | IntegX | Root | RootX | Limit | Genf | Sin | Cos | Tan | Sec | Csc | Cot | Concat | Tab | Slope | Dist | Input
-    public boolean MethodName() {
-        res = Contains(currentToken, methodNames);
-        if (!res) {
-            return false;
-        }
-        currentToken = getNextToken();
-        return true;
+        return false;
     }
 
     /// InstList -> Inst InstList | ε
-    public boolean InstList() {
-        res = Inst();
-        if (!res) {
-            return false;
+    public AstNode InstList() {
+        AstNode listNode = new AstNode("InstList");
+        
+        while (Contains(currentToken, firstAssign) || Contains(currentToken, methodNames) || 
+               isMatch("if") || isMatch("for") || isMatch("switch") || isMatch("return")) {
+            AstNode inst = Inst();
+            if (inst == null) return null;
+            listNode.addChild(inst);
         }
-        else
-            return InstList();
+        return listNode;
     }
 
-    /// Assign ; | Cond | For | Switch | Method ; | return Val ;
-    public boolean Inst() {
-
+    /// Inst -> Assign ; | Cond | For | Switch | Method ; | return Val ;
+    public AstNode Inst() {
+        if (isMatch("return")) {
+            consumeToken();
+            AstNode returnNode = new AstNode("Return");
+            AstNode val = Val();
+            if (val == null) return null;
+            returnNode.addChild(val);
+            if (!MatchAndConsume(";")) return null;
+            return returnNode;
+        }
+        
+        if (Contains(currentToken, firstAssign)) {
+            AstNode assignNode = Assign();
+            if (assignNode == null) return null;
+            if (!MatchAndConsume(";")) return null;
+            return assignNode;
+        }
+        
+        if (isMatch("if")) return Cond();
+        if (isMatch("for")) return For();
+        if (isMatch("switch")) return Switch();
+        
+        if (Contains(currentToken, methodNames)) {
+            AstNode methodNode = Method();
+            if (methodNode == null) return null;
+            if (!MatchAndConsume(";")) return null;
+            return methodNode;
+        }
+        
+        System.out.println("Unexpected token in Inst: " + currentToken);
+        return null;
     }
 
-    /// LogOp -> && | || | != | < | <= | > | >= | ==
-    public boolean LogOp() {
-        res = Contains(currentToken, logOp);
-        if (!res) {
-            return false;
+    /// Assign -> Type ident = Expr | ident = Expr
+    public AstNode Assign() {
+        // Check if it's a declaration (starts with Type) or assignment (starts with ID)
+        if (Contains(currentToken, dataTypes)) {
+            // Type ident = Expr
+            AstNode typeNode = Type(); // Consumes type
+            if (typeNode == null) return null;
+            
+            String id = tokens.get(currentIndex).getValue();
+            if (!MatchAndConsume("ID")) return null;
+            
+            if (!MatchAndConsume("=")) return null;
+            
+            AstNode expr = Expr();
+            if (expr == null) return null;
+            
+            AstNode assignNode = new AstNode("Declaration");
+            assignNode.addChild(typeNode);
+            assignNode.addChild(new AstNode("Identifier", id));
+            assignNode.addChild(expr);
+            return assignNode;
+        } else {
+            // ident = Expr
+            String id = tokens.get(currentIndex).getValue();
+            if (!MatchAndConsume("ID")) return null;
+            
+            if (!MatchAndConsume("=")) return null;
+            
+            AstNode expr = Expr();
+            if (expr == null) return null;
+            
+            AstNode assignNode = new AstNode("Assignment");
+            assignNode.addChild(new AstNode("Identifier", id));
+            assignNode.addChild(expr);
+            return assignNode;
         }
-        currentToken = getNextToken();
+    }
+
+    /// Cond -> if ( CondExp ) { InstList } Cond'
+    public AstNode Cond() {
+        if (!MatchAndConsume("if")) return null;
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode condNode = new AstNode("If");
+        AstNode condition = CondExp();
+        if (condition == null) return null;
+        condNode.addChild(condition);
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode thenBlock = InstList();
+        if (thenBlock == null) return null;
+        condNode.addChild(thenBlock);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        AstNode elsePart = CondPr();
+        if (elsePart != null) {
+            condNode.addChild(elsePart);
+        }
+        
+        return condNode;
+    }
+
+    /// Cond' -> ε | else Cond''
+    public AstNode CondPr() {
+        if (CheckAndConsume("else")) {
+            return CondPrPr();
+        }
+        return null; // epsilon
+    }
+
+    /// Cond'' -> { InstList } | Cond
+    public AstNode CondPrPr() {
+        if (CheckAndConsume("{")) {
+            AstNode elseBlock = InstList();
+            if (elseBlock == null) return null;
+            
+            if (!MatchAndConsume("}")) return null;
+            return elseBlock;
+        }
+        return Cond(); // else if ...
+    }
+
+    /// For -> for ( Assign ; CondExp ; Incr ) { InstList }
+    public AstNode For() {
+        if (!MatchAndConsume("for")) return null;
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode forNode = new AstNode("For");
+        
+        AstNode init = Assign();
+        if (init == null) return null;
+        forNode.addChild(init);
+        
+        if (!MatchAndConsume(";")) return null;
+        
+        AstNode cond = CondExp();
+        if (cond == null) return null;
+        forNode.addChild(cond);
+        
+        if (!MatchAndConsume(";")) return null;
+        
+        AstNode incr = Incr();
+        if (incr == null) return null;
+        forNode.addChild(incr);
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode body = InstList();
+        if (body == null) return null;
+        forNode.addChild(body);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        return forNode;
+    }
+    
+    /// Incr -> ident Incr'
+    public AstNode Incr() {
+        String id = tokens.get(currentIndex).getValue();
+        if (!MatchAndConsume("ID")) return null;
+        
+        // IncrPr returns the operation part
+        return IncrPr(id);
+    }
+    
+    /// Incr' -> = ident Op Val | OpIncr
+    public AstNode IncrPr(String id) {
+        if (CheckAndConsume("=")) {
+            // Assignment increment: i = i + 1
+            AstNode assignNode = new AstNode("Assignment");
+            assignNode.addChild(new AstNode("Identifier", id));
+            
+            // Parse RHS: ident Op Val
+            String rhsId = tokens.get(currentIndex).getValue();
+            if (!MatchAndConsume("ID")) return null;
+            
+            String op = currentToken;
+            if (!Op()) return null; // Consumes op
+            
+            AstNode val = Val();
+            if (val == null) return null;
+            
+            AstNode exprNode = new AstNode("BinaryOp", op);
+            exprNode.addChild(new AstNode("Identifier", rhsId));
+            exprNode.addChild(val);
+            
+            assignNode.addChild(exprNode);
+            return assignNode;
+        } else {
+            // OpIncr: i++
+            String op = currentToken;
+            if (!OpIncr()) return null; // Consumes ++/--
+            
+            AstNode updateNode = new AstNode("Update", op);
+            updateNode.addChild(new AstNode("Identifier", id));
+            return updateNode;
+        }
+    }
+    
+    /// Switch -> switch ( ident ) { CaseList default > InstList }
+    public AstNode Switch() {
+        if (!MatchAndConsume("switch")) return null;
+        if (!MatchAndConsume("(")) return null;
+        
+        String id = tokens.get(currentIndex).getValue();
+        if (!MatchAndConsume("ID")) return null;
+        
+        if (!MatchAndConsume(")")) return null;
+        if (!MatchAndConsume("{")) return null;
+        
+        AstNode switchNode = new AstNode("Switch");
+        switchNode.addChild(new AstNode("Identifier", id));
+        
+        AstNode cases = new AstNode("Cases");
+        if (!CaseList(cases)) return null;
+        switchNode.addChild(cases);
+        
+        if (!MatchAndConsume("default")) return null;
+        if (!MatchAndConsume(">")) return null;
+        
+        AstNode defaultNode = new AstNode("Default");
+        AstNode defaultInst = InstList();
+        if (defaultInst == null) return null;
+        defaultNode.addChild(defaultInst);
+        switchNode.addChild(defaultNode);
+        
+        if (!MatchAndConsume("}")) return null;
+        
+        return switchNode;
+    }
+    
+    // CaseList helper
+    public boolean CaseList(AstNode parent) {
+        AstNode caseNode = Case();
+        if (caseNode == null) return false;
+        parent.addChild(caseNode);
+        
+        return CaseListPr(parent);
+    }
+    
+    public boolean CaseListPr(AstNode parent) {
+        if (isMatch("case")) {
+            return CaseList(parent);
+        }
         return true;
     }
+    
+    /// Case -> case Val > InstList break ;
+    public AstNode Case() {
+        if (!MatchAndConsume("case")) return null;
+        
+        AstNode val = Val();
+        if (val == null) return null;
+        
+        if (!MatchAndConsume(">")) return null;
+        
+        AstNode body = InstList();
+        if (body == null) return null;
+        
+        if (!MatchAndConsume("break")) return null;
+        if (!MatchAndConsume(";")) return null;
+        
+        AstNode caseNode = new AstNode("Case");
+        caseNode.addChild(val);
+        caseNode.addChild(body);
+        return caseNode;
+    }
 
+    /// Expr -> Term Expr'
+    public AstNode Expr() {
+        AstNode lhs = Term();
+        if (lhs == null) return null;
+        return ExprPr(lhs);
+    }
 
+    /// Expr' -> + Term Expr' | - Term Expr' | ε
+    public AstNode ExprPr(AstNode lhs) {
+        if (Contains(currentToken, new String[]{"+", "-"})) {
+            String op = currentToken;
+            consumeToken();
+            AstNode rhs = Term();
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("BinaryOp", op);
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return ExprPr(newNode);
+        }
+        return lhs;
+    }
 
-    /// Function -> Type ident ( FParam ) { InstList }
-    public boolean Function() {
-        res = Type();
-        if (!res) {
-            return false;
+    /// Term -> Factor Term'
+    public AstNode Term() {
+        AstNode lhs = Factor();
+        if (lhs == null) return null;
+        return TermPr(lhs);
+    }
+
+    /// Term' -> * Factor Term' | / Factor Term' | % Factor Term' | ε
+    public AstNode TermPr(AstNode lhs) {
+        if (Contains(currentToken, new String[]{"*", "/", "%"})) {
+            String op = currentToken;
+            consumeToken();
+            AstNode rhs = Factor();
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("BinaryOp", op);
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return TermPr(newNode);
         }
-        res = Match("ID");
-        if (!res) {
-            return false;
+        return lhs;
+    }
+
+    /// Factor -> ( CondExp ) CondExp' | Val Factor'
+    public AstNode Factor() {
+        if (CheckAndConsume("(")) {
+            AstNode node = CondExp();
+            if (node == null) return null;
+            if (!MatchAndConsume(")")) return null;
+            return CondExpPr(node);
         }
-        res = Match("(");
-        if (!res) {
-            return false;
+        
+        AstNode val = Val();
+        if (val == null) return null;
+        return FactorPr(val);
+    }
+
+    /// Factor' -> ** Val | ε
+    public AstNode FactorPr(AstNode lhs) {
+        if (CheckAndConsume("**")) {
+            AstNode rhs = Val();
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("BinaryOp", "**");
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return newNode; 
         }
-        res = FParam();
-        if (!res) {
-            return false;
+        return lhs;
+    }
+    
+    /// CondExp -> Expr CondExp'
+    public AstNode CondExp() {
+        AstNode lhs = Expr();
+        if (lhs == null) return null;
+        return CondExpPr(lhs);
+    }
+    
+    /// CondExp' -> LogOp CondExp | ε
+    public AstNode CondExpPr(AstNode lhs) {
+        if (Contains(currentToken, logOp)) {
+            String op = currentToken;
+            consumeToken();
+            AstNode rhs = CondExp(); // Recursive calls Expr -> ...
+            if (rhs == null) return null;
+            
+            AstNode newNode = new AstNode("LogicOp", op);
+            newNode.addChild(lhs);
+            newNode.addChild(rhs);
+            return newNode;
         }
-        res = Match(")");
-        if (!res) {
-            return false;
+        return lhs;
+    }
+
+    /// Val -> num | lit | Method | PI | INF | ident Val'
+    public AstNode Val() {
+        if (Contains(currentToken, vals)) { 
+            AstNode node = new AstNode("Value", tokens.get(currentIndex).getValue());
+            consumeToken();
+            return node;
+        } else if (isMatch("ID")) {
+            String id = tokens.get(currentIndex).getValue();
+            consumeToken();
+            AstNode idNode = new AstNode("Identifier", id);
+            
+            // Val' -> [ Val ] | ε
+            if (CheckAndConsume("[")) {
+                 AstNode index = Val();
+                 if (index == null) return null;
+                 if (!MatchAndConsume("]")) return null;
+                 
+                 AstNode arrayAccess = new AstNode("ArrayAccess");
+                 arrayAccess.addChild(idNode);
+                 arrayAccess.addChild(index);
+                 return arrayAccess;
+            }
+            return idNode;
+        } else if (Contains(currentToken, methodNames)) {
+            return Method();
         }
-        res = Match("{");
-        if (!res) {
-            return false;
-        }
-        res = InstList();
-        if (!res) {
-            return false;
-        }
-        res = Match("}");
-        if (!res) {
-            return false;
+        return null;
+    }
+
+    /// Method -> MethodName ( Param )
+    public AstNode Method() {
+        String name = currentToken;
+        if (!MethodName()) return null; // Consumes name
+        
+        if (!MatchAndConsume("(")) return null;
+        
+        AstNode methodNode = new AstNode("MethodCall", name);
+        
+        if (!Param(methodNode)) return null;
+        
+        if (!MatchAndConsume(")")) return null;
+        return methodNode;
+    }
+
+    public boolean Param(AstNode parent) {
+        AstNode val = Val();
+        if (val == null) return false;
+        parent.addChild(val);
+        return ParamPr(parent);
+    }
+    
+    public boolean ParamPr(AstNode parent) {
+        if (CheckAndConsume(",")) {
+            return Param(parent);
         }
         return true;
     }
 
     /// FParam -> ε | TypeIdent
-    private boolean FParam() {
-        if(Contains(currentToken, dataTypes)) {
-            return TypeIdent();
+    private boolean FParam(AstNode parent) {
+        if (Contains(currentToken, dataTypes)) {
+            return TypeIdent(parent);
+        }
+        return true;
+    }
+    
+    /// TypeIdent -> Type ident TypeIdent'
+    public boolean TypeIdent(AstNode parent) {
+        AstNode typeNode = Type();
+        if (typeNode == null) return false;
+        
+        String id = tokens.get(currentIndex).getValue();
+        if (!MatchAndConsume("ID")) return false;
+        
+        AstNode param = new AstNode("Parameter");
+        param.addChild(typeNode);
+        param.addChild(new AstNode("Identifier", id));
+        parent.addChild(param);
+        
+        return TypeIdentPr(parent);
+    }
+    
+    public boolean TypeIdentPr(AstNode parent) {
+        if (CheckAndConsume(",")) {
+            return TypeIdent(parent);
         }
         return true;
     }
 
-
-    /// TypeIdent -> Type ident TypeIdent’
-    public boolean TypeIdent() {
-        res = Type();
-        if (!res) {
-            return false;
-        }
-        res = Match("ID");
-        if (!res) {
-            return false;
-        }
-        return TypeIdentPr();
-    }
-
-    /// TypeIdent’ -> ε | , TypeIdent
-    public boolean TypeIdentPr(){
-        res = Match(",");
-        if (res) {
-            return TypeIdent();
-        }
-        return true;
-    }
-
-
-    /// Match non-terminals in a production rule with Terminal non-terminal Terminal style.
-    public boolean Match(String token) {
-        res = token.equals(currentToken);
-        if (!res) {
-            return false;
-        }
-        currentToken = getNextToken();
-        return true;
-    }
-
-    /// Get next token in the token arraylist
-    private String getNextToken() {
-        currentIndex++;
-        if (currentIndex >= tokens.size()) {
-            System.out.println("No more tokens to analyze, this should not happen, I tink");
-            res = false;
-        }
-        return tokens.get(currentIndex);
-    }
-
-    /// Contains as if .NET, java is shit, does not have C# functions
-    private boolean Contains(String token, String[] stringsToCompareTo) {
-        if (token == null || stringsToCompareTo == null) {
-            return false;
-        }
-        for (String str : stringsToCompareTo) {
-            if (token.equals(str)) {
-                return true;
-            }
+    // Helpers
+    
+    public boolean MethodName() {
+        if (Contains(currentToken, methodNames)) {
+            consumeToken();
+            return true;
         }
         return false;
     }
 
-    /// Val -> num | lit | Method | PI | INF | ident Val’
-    public boolean Val() {
-        if (Contains(currentToken, vals)) {
-            currentToken = getNextToken();
+    public boolean Op() {
+        if (Contains(currentToken, op)) {
+            consumeToken();
             return true;
-        } else if (Match("ID")) {
-            return ValPr();
-        } else {
-            return Method();
         }
+        return false;
     }
-
-    /// Method -> MethodName ( Param )
-    public boolean Method() {
-        res = MethodName();
-        if (!res) {
-            return false;
-        }
-        res = Match("(");
-        if (!res) {
-            return false;
-        }
-        res = Param();
-        if (!res) {
-            return false;
-        }
-        res = Match(")");
-        return res;
-    }
-
-    /// Param -> Val Param’
-    public boolean Param() {
-        res = Val();
-        if (!res) {
-            return false;
-        }
-        return ParamPr();
-    }
-
-    ///  Param’ -> ε | , Param
-    public boolean ParamPr() {
-        res = Match(",");
-        if (res) {
-            return Param();
-        }
-        return true;
-    }
-
-    /// Val’ -> ε | [ *num ]
-    public boolean ValPr() {
-        res = Match("[");
-        if (res) {
-            res = Val();
-            if (!res) {
-                return false;
-            }
-            return Match("]");
-        }
-        return true;
-    }
-
-    /// OpIncr -> ++ | - -
+    
     public boolean OpIncr() {
-        res = Contains(currentToken, opIncr);
-        if (!res) {
-            return false;
+        if (Contains(currentToken, opIncr)) {
+            consumeToken();
+            return true;
         }
-        currentToken = getNextToken();
-        return true;
+        return false;
+    }
+    
+    public boolean LogOp() {
+        if (Contains(currentToken, logOp)) {
+            consumeToken();
+            return true;
+        }
+        return false;
     }
 
-    /// Expr -> Term Expr’
-    public boolean Expr() {
-        res = Term();
-        if (!res) {
-            return false;
+    private boolean MatchAndConsume(String token) {
+        if (token.equals(currentToken)) {
+            consumeToken();
+            return true;
         }
-        return ExprPr();
+        System.out.println("Expected '" + token + "', found '" + currentToken + "' at index " + currentIndex);
+        return false;
     }
 
-    /// Term -> Factor Term’
-    public boolean Term() {
-        res = Factor();
-        if (!res) {
-            return false;
+    private boolean CheckAndConsume(String token) {
+        if (token.equals(currentToken)) {
+            consumeToken();
+            return true;
         }
-        return TermPr();
+        return false;
+    }
+    
+    private boolean isMatch(String token) {
+        return token.equals(currentToken);
+    }
+    
+    private boolean Match(String token) {
+        return token.equals(currentToken);
     }
 
-    /// Factor -> ( CondExp ) CondExp’ | Val Factor’
-    public boolean Factor() {
-        res = Match("(");
-        if (res) {
-            res = CondExp();
-            if (!res) {
-                return false;
-            }
-            res = Match(")");
-            if  (!res) {
-                return false;
-            }
-            return CondExprPr();
+    private void consumeToken() {
+        currentIndex++;
+        if (currentIndex < tokens.size()) {
+            currentToken = tokens.get(currentIndex).getKey();
+        } else {
+            currentToken = "eof";
         }
-        res = Val();
-        if (!res) {
-            return false;
-        }
-        return FactorPr();
     }
 
-    /// Expr’ -> + Term Expr’ | - Term Expr’ | ε
-    public boolean ExprPr() {
-        String []  masmenos = {"+","-"};
-        if(Contains(currentToken ,masmenos)){
-            currentToken = getNextToken();
-            res = Term();
-            if (!res) {
-                return false;
-            }
-            return ExprPr();
+    private boolean Contains(String token, String[] list) {
+        if (token == null || list == null) return false;
+        for (String s : list) {
+            if (token.equals(s)) return true;
         }
-        return true;
-    }
-
-    /// Term’ -> * Factor Term’ | / Factor Term’ | % Factor Term’ | ε
-    public boolean TermPr(){
-        String[] prdivmod = {"*", "/", " %"};
-        if(Contains(currentToken ,prdivmod)){
-            currentToken = getNextToken();
-            res = Factor();
-            if (!res) {
-                return false;
-            }
-            return TermPr();
-        }
-        return true;
-    }
-
-    /// Factor’ -> ** Val | ε
-    public boolean FactorPr(){
-        res = Match("**");
-        if (res) {
-            return Val();
-        }
-        return true;
-    }
-
-    /// CondExp -> Expr CondExp’
-    public boolean CondExp(){
-        res = Expr();
-        if (!res) {
-            return false;
-        }
-        return CondExprPr();
-    }
-
-    /// CondExp’ -> LogOp CondExp | ε
-    public boolean CondExprPr(){
-        res = Contains(currentToken, logOp);
-        if (res) {
-            res = CondExp();
-            if (!res) {
-                return false;
-            }
-            return CondExp();
-        }
-        return true;
+        return false;
     }
 }
