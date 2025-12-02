@@ -17,13 +17,12 @@ Log-Message "Starting execution..."
 # 1. Run .NET program
 Log-Message "Running .NET program..."
 
-# Execute dotnet run and capture output and error streams
-# utilizing cmd /c to ensure redirection works as expected for external processes if needed, 
-# but standard piping usually works. 
-# However, checking exit code directly after pipe in PS can be tricky if not careful.
-# We will use Start-Process -NoNewWindow -Wait to ensure we catch the exit code correctly if simpler piping fails,
-# but simpler piping:
-dotnet run --project . 2>&1 | Tee-Object -FilePath $LogFile -Append
+# Execute dotnet run, convert output to strings (handling error streams), and log to both console and file in UTF-8
+dotnet run --project . 2>&1 | ForEach-Object { 
+    $str = "$_" 
+    Write-Host $str 
+    $str | Out-File -FilePath $LogFile -Append -Encoding utf8 
+}
 
 if ($LASTEXITCODE -ne 0) {
     Log-Message "Error: .NET program failed."
@@ -43,10 +42,24 @@ if (-not (Test-Path "parser")) {
 Push-Location parser
 
 try {
-    # PowerShell wrapper for mvn might be needed if it's a .cmd file, but typically 'mvn' resolves to mvn.cmd in PS.
-    # We use 'cmd /c mvn ...' to be safe if environment variables are tricky, but usually direct call is fine.
-    # Let's try direct call.
-    mvn compile exec:java -Dexec.mainClass="org.example.Main" 2>&1 | Tee-Object -FilePath "..\$LogFile" -Append
+    # Use cmd /c mvn to ensure we pick up mvn.cmd on Windows if not directly executable, 
+    # though 'mvn' usually works if in PATH.
+    if ($IsWindows) {
+        $mvnCmd = "mvn.cmd"
+    } else {
+        $mvnCmd = "mvn"
+    }
+    
+    # Check if we can find the command, fallback to just 'mvn' if check fails or simplistic
+    if (-not (Get-Command $mvnCmd -ErrorAction SilentlyContinue)) {
+        $mvnCmd = "mvn" 
+    }
+
+    & $mvnCmd 'exec:java' '-Dexec.mainClass=org.example.Main' 2>&1 | ForEach-Object { 
+        $str = "$_" 
+        Write-Host $str 
+        $str | Out-File -FilePath "..\$LogFile" -Append -Encoding utf8 
+    }
     
     if ($LASTEXITCODE -ne 0) {
         # Tee-Object might mask the exit code of the left side in some PS versions/configurations 
