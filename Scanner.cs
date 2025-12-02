@@ -20,7 +20,6 @@ public class Scanner
         {
             
             var formattedLine = line.Trim() + " ";
-            Console.WriteLine(formattedLine);
             formattedLine = (formattedLine == " ") ? "" : formattedLine;
             codeAsAString += formattedLine;
 

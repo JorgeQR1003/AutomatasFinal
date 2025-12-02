@@ -133,8 +133,14 @@ public class Parser {
         return listNode;
     }
 
-    /// Inst -> Assign ; | Cond | For | Switch | Method ; | return Val ;
+    /// Inst -> Assign ; | Cond | For | Switch | Method ; | return Val ; | break ;
     public AstNode Inst() {
+        if (isMatch("break")) {
+            consumeToken();
+            if (!MatchAndConsume(";")) return null;
+            return new AstNode("Break");
+        }
+
         if (isMatch("return")) {
             consumeToken();
             AstNode returnNode = new AstNode("Return");

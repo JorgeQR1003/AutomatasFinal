@@ -1,5 +1,5 @@
 </ Codigo de prueba >
-void Main() {
+int Main() {
     string mensaje = "Hola mundo";
     bool activo = 0;
     char simbolo = "x";

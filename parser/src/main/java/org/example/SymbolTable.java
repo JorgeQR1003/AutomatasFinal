@@ -16,6 +16,7 @@ public class SymbolTable {
     
     public SymbolTable() {
         this.scopeStack = new Stack<HashMap<String, String>>();
+        scopeStack.push(new HashMap<String, String>());
     }
 
     // enterScope pushes a new scope onto the stack, making it the most recent scope in the stack.
@@ -25,7 +26,8 @@ public class SymbolTable {
 
     // findSymbol returns the symbol and its type if it exists, otherwise returns null
     public SimpleEntry<String, String> findSymbol(String symbol) {
-        for (HashMap<String, String> scope : scopeStack) {
+        for (int i = scopeStack.size() - 1; i >= 0; i--) {
+            HashMap<String, String> scope = scopeStack.get(i);
             if (scope.containsKey(symbol)) {
                 return new SimpleEntry<String, String>(symbol, scope.get(symbol));
             }

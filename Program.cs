@@ -335,7 +335,7 @@ internal class Program
 
     static void Main(string[] args)
     {
-        Scanner scanner = new Scanner("..//..//..//FilePruebas.txt");
+        Scanner scanner = new Scanner("FilePruebas.txt");
        
         //Se hace un lista de tokens con el string
         List<(string, string)> tokens = GetTokens(scanner.getInput());
@@ -356,11 +356,9 @@ internal class Program
         Console.WriteLine();
 
         //Se guarda la lista de tokens en un archivo JSON
-        string outputPath = "..//..//..//tokens.json";
+        string outputPath = "tokens.json";
         SaveTokensToJson(tokens, outputPath);
         Console.WriteLine($"Tokens guardados en: {outputPath}");
 
-
-        Console.ReadKey();
     }
 }
